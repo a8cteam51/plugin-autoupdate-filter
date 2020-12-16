@@ -1,2 +1,2 @@
-# plugin-autoupdate-commander
-Plugin which sets autoupdates to run during specific times
+# plugin-autoupdate-filter
+Plugin which filters plugin auto-updates to run during specific times only
