@@ -65,16 +65,16 @@ function ping_on_update( $upgrader_object, $options ) {
 
     foreach( $options['plugins'] as $plugin ) {
 
-       $slack_message = $plugin . ' plugin updated on ' . $site_url;
+       $slack_message = 'PLUGIN UPDATED: ' . $plugin . ' updated on ' . $site_url;
 
          $slack_settings = [
            'username'   => 'team51-bot',
            'channel'    => '#team51-bots',
            'link_names' => true,
-           'icon'       => ':workinglikeadog:',
+           'icon'       => ':robot_face:',
          ];
 
-         $slack_client = new Maknz\Slack\Client( 'test', $slack_settings );
+         $slack_client = new Maknz\Slack\Client( 'https://webhooks.wpspecialprojects.com/hooks/log-to-slack', $slack_settings );
          $slack_client->to( '#team51-bots' )->send( $slack_message );
 
        }
