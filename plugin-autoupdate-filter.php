@@ -51,3 +51,32 @@ if ( is_admin() ) {
     }
   }
 }
+
+// ping Slack when any plugin updates
+add_action( 'upgrader_process_complete', 'ping_on_update',10, 2);
+
+function ping_on_update( $upgrader_object, $options ) {
+
+  if( $options['action'] == 'update' && $options['type'] == 'plugin' && isset( $options['plugins'] ) ) {
+
+    require __DIR__ . '/vendor/autoload.php';
+
+    $site_url = site_url();
+
+    foreach( $options['plugins'] as $plugin ) {
+
+       $slack_message = $plugin . ' plugin updated on ' . $site_url;
+
+         $slack_settings = [
+           'username'   => 'team51-bot',
+           'channel'    => '#team51-bots',
+           'link_names' => true,
+           'icon'       => ':workinglikeadog:',
+         ];
+
+         $slack_client = new Maknz\Slack\Client( 'test', $slack_settings );
+         $slack_client->to( '#team51-bots' )->send( $slack_message );
+
+       }
+    }
+}
