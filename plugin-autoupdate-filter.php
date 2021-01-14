@@ -32,25 +32,9 @@ function auto_update_specific_times ( $update, $item ) {
 }
 add_filter( 'auto_update_plugin', 'auto_update_specific_times', 10, 2 );
 
-if ( is_admin() ) {
-  add_action( 'current_screen', 'plugins_page_code' );
+// Replace automatic update wording on Plugin management page in admin
+add_filter( 'plugin_auto_update_setting_html', function( $html, $plugin_file, $plugin_data ) { return 'Auto-updates managed by WP Special Projects team <br/>(enabled during business hours)'; } , 11, 3 );
 
-  // Run code on the admin plugins page only
-  function plugins_page_code() {
-    $currentScreen = get_current_screen();
-    if( $currentScreen->id === "plugins" ) {
-      function translate_update_text( $translated_text, $text, $domain ) {
-        switch ( $translated_text ) {
-          case 'Auto-updates disabled' :
-          $translated_text = __( 'Auto-updates enabled during business hours', '' );
-          break;
-        }
-        return $translated_text;
-      }
-      add_filter( 'gettext', 'translate_update_text', 20, 3 );
-    }
-  }
-}
 
 // ping Slack when any plugin updates
 
