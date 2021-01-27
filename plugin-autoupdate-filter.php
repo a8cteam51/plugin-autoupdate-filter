@@ -26,29 +26,26 @@ if( !defined( 'WP_AUTO_UPDATE_CORE') ) define( 'WP_AUTO_UPDATE_CORE', false );
 
 add_filter( 'pre_http_request', 'block_request', 10, 3 );
 
-function block_request($pre, $args, $url) {
+function block_request( $pre, $args, $url ) {
 	/* Empty url */
 	if( empty( $url ) ) {
 		return $pre;
 	}
 
 	/* Invalid host */
-	if( !$host = parse_url($url, PHP_URL_HOST) ) {
+	if( !$host = parse_url( $url, PHP_URL_HOST ) ) {
 		return $pre;
 	}
 
 	$url_data = parse_url( $url );
 
 	/* block request */
-	if( false !== stripos( $host, 'api.wordpress.org' ) && (false !== stripos( $url_data['path'], 'update-check' ) || false !== stripos( $url_data['path'], 'version-check' ) || false !== stripos( $url_data['path'], 'browse-happy' ) || false !== stripos( $url_data['path'], 'serve-happy' )) ) {
+	if( false !== stripos( $host, 'api.wordpress.org' ) && ( false !== stripos( $url_data['path'], 'update-check' ) || false !== stripos( $url_data['path'], 'version-check' ) || false !== stripos( $url_data['path'], 'serve-happy' ) ) ) {
 		return true;
 	}
 
 	return $pre;
 }
-
-// Replace automatic update wording on Plugin management page in admin
-// add_filter( 'plugin_auto_update_setting_html', function( $html, $plugin_file, $plugin_data ) { return 'Auto-updates managed by WP Special Projects team <br/>(enabled during business hours)'; } , 100, 3 );
 
 // ping Slack when any plugin updates
 
@@ -95,12 +92,7 @@ function ping_on_update( $upgrader_object, $options ) {
                $site_url
            )
        );
-
-<<<<<<< Updated upstream
-=======
-			 // error_log( 'In ' . __FUNCTION__ . '(), backtrace = ' . print_r(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
-
->>>>>>> Stashed changes
+       
        }
     }
 }
