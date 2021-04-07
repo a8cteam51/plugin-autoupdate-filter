@@ -11,93 +11,99 @@ License: GPLv3
 
 class Plugin_Autoupdate_Filter {
 
+	public function __construct() {
+
+		// setup plugins to autoupdate _unless_ it's during specific day/time
+		add_filter( 'auto_update_plugin', 'auto_update_specific_times', 10, 2 );
+
+		// Replace automatic update wording on plugin management page in admin
+		add_filter(
+			'plugin_auto_update_setting_html',
+			function( $html, $plugin_file, $plugin_data ) {
+				return 'Auto-updates managed by WP Special Projects team';
+			},
+			11,
+			3
+		);
+
+		// ping Slack when any plugin updates
+		add_action( 'upgrader_process_complete', 'ping_on_update', 10, 2 );
+	}
+
 	// setup plugins to autoupdate _unless_ it's during specific day/time
-	function auto_update_specific_times ( $update, $item ) {
+	public function auto_update_specific_times( $update, $item ) {
 
-		// Set these to run in U.S. Eastern time zone, which is most of our business hours
-		date_default_timezone_set('America/New_York');
+		$start = '10'; // 6am Eastern
+		$end   = '23'; // 7pm Eastern
 
-		$start = "10"; // 6am Eastern
-		$end = "23"; // 7pm Eastern
-
-		$hour = gmdate('H'); // Current hour
-		$day = gmdate('D');  // Current day of the week
+		$hour = gmdate( 'H' ); // Current hour
+		$day  = gmdate( 'D' );  // Current day of the week
 
 		// If outside business hours, disable auto-updates
-		if ( $hour < $start || $hour > $end || 'Sat' == $day  || 'Sun' == $day )
-		{
-			return false;
-
+		if ( $hour < $start || $hour > $end || 'Sat' === $day || 'Sun' === $day ) {
 			$site_url = site_url();
-			$slug = $item->slug;
+			$slug     = $item->slug;
 
 			log_to_slack(
 				sprintf(
 					'PLUGIN AUTOUPDATE FILTER: %s prevented from updating on %s',
 					$slug,
 					$site_url
-					)
-				);
-			}
+				)
+			);
+			return false;
+		}
 
 			// Otherwise, plugins will autoupdate regardless of settings in wp-admin
 			return true;
-		}
-		add_filter( 'auto_update_plugin', 'auto_update_specific_times', 10, 2 );
-
-		// Replace automatic update wording on plugin management page in admin
-		add_filter( 'plugin_auto_update_setting_html', function( $html, $plugin_file, $plugin_data ) { return 'Auto-updates managed by WP Special Projects team'; } , 11, 3 );
-
+	}
 
 		// ping slack helper function
-		function log_to_slack( $message ) {
+	public function log_to_slack( $message ) {
 
-			define( SLACK_WEBHOOK_URL, 'https://webhooks.wpspecialprojects.com/hooks/log-to-slack' );
+		define( SLACK_WEBHOOK_URL, 'https://webhooks.wpspecialprojects.com/hooks/log-to-slack' );
 
-			$message = json_encode( array( 'message' => $message ) );
+		$message = wp_json_encode( array( 'message' => $message ) );
 
-			$headers = array(
-				'Accept: application/json',
-				'Content-Type: application/json',
-				'User-Agent: PHP',
-			);
+		$headers = array(
+			'Accept: application/json',
+			'Content-Type: application/json',
+			'User-Agent: PHP',
+		);
 
-			$options = array(
-				'http' => array(
-					'header'  => $headers,
-					'method'  => 'POST',
-					'content' => $message,
-				),
-			);
+		$options = array(
+			'http' => array(
+				'header'  => $headers,
+				'method'  => 'POST',
+				'content' => $message,
+			),
+		);
 
-			$context = stream_context_create( $options );
-			$result  = @file_get_contents( SLACK_WEBHOOK_URL, false, $context );
+		$context = stream_context_create( $options );
+		$result  = @file_get_contents( SLACK_WEBHOOK_URL, false, $context );
 
-			return json_decode( $result );
-		}
+		return wp_json_decode( $result );
+	}
 
 
-		// ping Slack when any plugin updates
-		add_action( 'upgrader_process_complete', 'ping_on_update',10, 2);
+	public function ping_on_update( $upgrader_object, $options ) {
 
-		function ping_on_update( $upgrader_object, $options ) {
+		if ( 'update' === $options['action'] && 'plugin' === $options['type'] && isset( $options['plugins'] ) ) {
 
-			if( $options['action'] == 'update' && $options['type'] == 'plugin' && isset( $options['plugins'] ) ) {
+			$site_url = site_url();
 
-				$site_url = site_url();
+			foreach ( $options['plugins'] as $plugin ) {
 
-				foreach( $options['plugins'] as $plugin ) {
+				log_to_slack(
+					sprintf(
+						'PLUGIN AUTOUPDATE FILTER: %s updated on %s',
+						$plugin,
+						$site_url
+					)
+				);
 
-					log_to_slack(
-						sprintf(
-							'PLUGIN AUTOUPDATE FILTER: %s updated on %s',
-							$plugin,
-							$site_url
-							)
-						);
-
-					}
-				}
 			}
 		}
+	}
+}
 		new Plugin_Autoupdate_Filter();
