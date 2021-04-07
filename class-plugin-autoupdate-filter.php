@@ -1,15 +1,9 @@
 <?php
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
 class Plugin_Autoupdate_Filter {
-
-	public static function init() {
-		$class = __CLASS__;
-		new $class();
-	}
 
 	public function __construct() {
 
@@ -106,3 +100,4 @@ class Plugin_Autoupdate_Filter {
 		}
 	}
 }
+new Plugin_Autoupdate_Filter();
