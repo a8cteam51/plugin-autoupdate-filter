@@ -9,46 +9,44 @@ Author URI:
 License: GPLv3
 */
 
-add_filter( 'automatic_updater_disabled', '__return_true' );
-add_filter( 'allow_minor_auto_core_updates', '__return_false' );
-add_filter( 'allow_major_auto_core_updates', '__return_false' );
-add_filter( 'allow_dev_auto_core_updates', '__return_false' );
-add_filter( 'auto_update_core', '__return_false' );
-add_filter( 'wp_auto_update_core', '__return_false' );
-add_filter( 'auto_core_update_send_email', '__return_false' );
-add_filter( 'send_core_update_notification_email', '__return_false' );
-add_filter( 'auto_update_plugin', '__return_false' );
-add_filter( 'auto_update_theme', '__return_false' );
-add_filter( 'automatic_updates_send_debug_email', '__return_false' );
-add_filter( 'automatic_updates_send_debug_email ', '__return_false', 1 );
-if( !defined( 'AUTOMATIC_UPDATER_DISABLED' ) ) define( 'AUTOMATIC_UPDATER_DISABLED', true );
-if( !defined( 'WP_AUTO_UPDATE_CORE') ) define( 'WP_AUTO_UPDATE_CORE', false );
+function auto_update_specific_times ( $update, $item ) {
 
-add_filter( 'pre_http_request', 'block_request', 10, 3 );
+  // Set these to run in U.S. Eastern time zone, which is most of our business hours
+  date_default_timezone_set('America/New_York');
 
-function block_request( $pre, $args, $url ) {
-	/* Empty url */
-	if( empty( $url ) ) {
-		return $pre;
-	}
+  $start = "09"; // 9am
+  $end = "14"; // 2pm
 
-	/* Invalid host */
-	if( !$host = parse_url( $url, PHP_URL_HOST ) ) {
-		return $pre;
-	}
+  $hour = date('H'); // Current hour
+  $day = date('D');  // Current day of the week
 
-	$url_data = parse_url( $url );
+  // If outside business hours, disable auto-updates
+  if ( $hour < $start || $hour > $end || 'Sat' == $day  || 'Sun' == $day )
+  {
+    return false;
 
-	/* block request */
-	if( false !== stripos( $host, 'api.wordpress.org' ) && ( false !== stripos( $url_data['path'], 'update-check' ) || false !== stripos( $url_data['path'], 'version-check' ) || false !== stripos( $url_data['path'], 'serve-happy' ) ) ) {
-		return true;
-	}
+		$site_url = site_url();
+		$slug = $item->slug;
 
-	return $pre;
+		log_to_slack(
+				sprintf(
+						'PLUGIN UPDATED: %s updated on %s',
+						$slug,
+						$site_url
+				)
+		);
+  }
+
+  // Otherwise, plugins will autoupdate regardless of settings in wp-admin
+  return true;
 }
+add_filter( 'auto_update_plugin', 'auto_update_specific_times', 10, 2 );
 
-// ping Slack when any plugin updates
+// Replace automatic update wording on plugin management page in admin
+add_filter( 'plugin_auto_update_setting_html', function( $html, $plugin_file, $plugin_data ) { return 'Auto-updates managed by WP Special Projects team <br/>(enabled during business hours)'; } , 11, 3 );
 
+
+// ping slack helper function
 function log_to_slack( $message ) {
 
 		define( SLACK_WEBHOOK_URL, 'https://webhooks.wpspecialprojects.com/hooks/log-to-slack' );
@@ -75,6 +73,8 @@ function log_to_slack( $message ) {
 		return json_decode( $result );
 	}
 
+
+// ping Slack when any plugin updates
 add_action( 'upgrader_process_complete', 'ping_on_update',10, 2);
 
 function ping_on_update( $upgrader_object, $options ) {
@@ -92,7 +92,7 @@ function ping_on_update( $upgrader_object, $options ) {
                $site_url
            )
        );
-       
+
        }
     }
 }
