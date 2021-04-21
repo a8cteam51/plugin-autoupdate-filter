@@ -7,8 +7,6 @@ class Plugin_Autoupdate_Filter {
 
 	public function __construct() {
 
-		define( SLACK_WEBHOOK_URL, 'https://webhooks.wpspecialprojects.com/hooks/log-to-slack' );
-
 		// setup plugins to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
 
@@ -40,63 +38,11 @@ class Plugin_Autoupdate_Filter {
 			$site_url = site_url();
 			$slug     = $item->slug;
 
-			$this->log_to_slack(
-				sprintf(
-					'PLUGIN AUTOUPDATE FILTER: %s prevented from updating on %s',
-					$slug,
-					$site_url
-				)
-			);
 			return false;
 		}
 
 			// Otherwise, plugins will autoupdate regardless of settings in wp-admin
 			return true;
-	}
-
-	public function ping_on_update( $upgrader_object, $options ) {
-
-		if ( 'update' === $options['action'] && 'plugin' === $options['type'] && isset( $options['plugins'] ) ) {
-
-			$site_url = site_url();
-
-			foreach ( $options['plugins'] as $plugin ) {
-
-				$this->log_to_slack(
-					sprintf(
-						'PLUGIN AUTOUPDATE FILTER: %s updated on %s',
-						$plugin,
-						$site_url
-					)
-				);
-
-			}
-		}
-	}
-
-	// ping slack helper function
-	public function log_to_slack( $message ) {
-
-		$message = wp_json_encode( array( 'message' => $message ) );
-
-		$headers = array(
-			'Accept: application/json',
-			'Content-Type: application/json',
-			'User-Agent: PHP',
-		);
-
-		$options = array(
-			'http' => array(
-				'header'  => $headers,
-				'method'  => 'POST',
-				'content' => $message,
-			),
-		);
-
-		$context = stream_context_create( $options );
-		$result  = @file_get_contents( SLACK_WEBHOOK_URL, false, $context );
-
-		return json_decode( $result );
 	}
 
 }
