@@ -20,24 +20,20 @@ class Plugin_Autoupdate_Filter {
 			3
 		);
 
-		// ping Slack when any plugin updates
-		add_action( 'upgrader_process_complete', array( $this, 'ping_on_update' ), 10, 2 );
 	}
 
 	// setup plugins to autoupdate _unless_ it's during specific day/time
 	public function auto_update_specific_times( $update, $item ) {
 
-		$start = '10'; // 6am Eastern
-		$end   = '23'; // 7pm Eastern
+		$start 			= '10'; // 6am Eastern
+		$end   			= '23'; // 7pm Eastern
+		$friday_end = '19'; // 3pm Eastern on Fridays
 
 		$hour = gmdate( 'H' ); // Current hour
 		$day  = gmdate( 'D' );  // Current day of the week
 
 		// If outside business hours, disable auto-updates
-		if ( $hour < $start || $hour > $end || 'Sat' === $day || 'Sun' === $day ) {
-			$site_url = site_url();
-			$slug     = $item->slug;
-
+		if ( $hour < $start || $hour > $end || 'Sat' === $day || 'Sun' === $day || ( 'Fri' === $day && $hour > $friday_end ) ) {
 			return false;
 		}
 
