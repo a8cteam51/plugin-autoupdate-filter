@@ -14,7 +14,7 @@ class Plugin_Autoupdate_Filter {
 		add_filter(
 			'plugin_auto_update_setting_html',
 			function( $html, $plugin_file, $plugin_data ) {
-				return 'Auto-updates managed by WP Special Projects team';
+				return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
 			},
 			11,
 			3
@@ -25,8 +25,8 @@ class Plugin_Autoupdate_Filter {
 	// setup plugins to autoupdate _unless_ it's during specific day/time
 	public function auto_update_specific_times( $update, $item ) {
 
-		$start 			= '10'; // 6am Eastern
-		$end   			= '23'; // 7pm Eastern
+		$start      = '10'; // 6am Eastern
+		$end        = '23'; // 7pm Eastern
 		$friday_end = '19'; // 3pm Eastern on Fridays
 
 		$hour = gmdate( 'H' ); // Current hour
