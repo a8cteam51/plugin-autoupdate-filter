@@ -1,5 +1,5 @@
 # plugin-autoupdate-filter
-Plugin which filters plugin auto-updates to run on specific days and during specific times only.
+Sets plugin automatic updates to always on, but only happen during specific days and times.
 
 ## Usage
 This plugin filters the core `auto_update_plugin` functionality to always run autoupdates during specific hours. It doesn't respect any toggle settings prior to activating this plugin, and is also respected by Jetpack autoupdate settings (the Jetpack autoupdate toggles may still reflect something different, but are not meaningful if this plugin is activated).
