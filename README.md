@@ -14,21 +14,16 @@ If you'd like to customize the times and days, you can filter them. e.g.:
 ```
 function custom_autoupdate_hours( $hours ) {
   return array(
-    start			 => '10', // 6am Eastern
-    end				 => '23', // 7pm Eastern
+    start => '10', // 6am Eastern
+    end => '23', // 7pm Eastern
     friday_end => '20', // 4pm Eastern on Fridays
   );
 }
 add_filter( 'plugin_autoupdate_filter_hours', 'custom_autoupdate_hours' );
 ```
 ```
-// Delete the lines with the days you want autoupdates to run on
-function custom_autoupdate_days( $days_off ) {
-  array(
-    Mon,
-    Tue,
-    Wed,
-    Thu,
+function custom_autoupdate_days_off( $days_off ) {
+  return array(
     Fri,
     Sat,
     Sun,
