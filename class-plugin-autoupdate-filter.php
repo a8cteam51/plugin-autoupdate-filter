@@ -25,15 +25,24 @@ class Plugin_Autoupdate_Filter {
 	// setup plugins to autoupdate _unless_ it's during specific day/time
 	public function auto_update_specific_times( $update, $item ) {
 
-		$start      = '10'; // 6am Eastern
-		$end        = '23'; // 7pm Eastern
-		$friday_end = '19'; // 3pm Eastern on Fridays
+		$hours = array(
+			start			 => '10', // 6am Eastern
+			end				 => '23', // 7pm Eastern
+			friday_end => '19', // 3pm Eastern on Fridays
+		);
+		$hours = apply_filters( 'plugin_autoupdate_filter_hours', $hours );
+
+		$days_off = array(
+			Sat,
+			Sun,
+		);
+		$days_off = apply_filters( 'plugin_autoupdate_filter_days_off', $days_off );
 
 		$hour = gmdate( 'H' ); // Current hour
 		$day  = gmdate( 'D' );  // Current day of the week
 
 		// If outside business hours, disable auto-updates
-		if ( $hour < $start || $hour > $end || 'Sat' === $day || 'Sun' === $day || ( 'Fri' === $day && $hour > $friday_end ) ) {
+		if ( $hour < $hours[start] || $hour > $hours[end] || in_array( $day, $days_off ) ) || ( 'Fri' === $day && $hour > $hours[friday_end] ) ) {
 			return false;
 		}
 
