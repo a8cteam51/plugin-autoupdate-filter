@@ -38,7 +38,7 @@ class Plugin_Autoupdate_Filter {
 		foreach ( $holidays as $holiday ) {
 			$start = $holiday['start'];
 			$end   = $holiday['end'];
-			if ( $start <= $now && $end => $now ) {
+			if ( $start <= $now && $now <= $end ) {
 				return false;
 			}
 		}
