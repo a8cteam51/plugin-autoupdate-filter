@@ -52,7 +52,7 @@ If you'd like to set windows of time for no updates, you can filter them. e.g.:
 $holidays = array(
   'christmas' => array(
     'start' => '2021-12-23 00:00:00',
-    'end'   => '2021-12-25 00:00:00'
+    'end'   => '2021-12-26 00:00:00'
   ),
 );
 add_filter( 'plugin_autoupdate_filter_holidays', 'custom_autoupdate_holidays' );

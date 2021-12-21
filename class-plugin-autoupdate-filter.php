@@ -28,16 +28,17 @@ class Plugin_Autoupdate_Filter {
 		$holidays = array(
 			'christmas' => array(
 				'start' => '2021-12-23 00:00:00',
-				'end'   => '2021-12-25 00:00:00',
+				'end'   => '2021-12-26 00:00:00',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
 
-		$now = gmdate();
+		$now = gmdate("Y-m-d H:i:s");
+
 		foreach ( $holidays as $holiday ) {
 			$start = $holiday['start'];
 			$end   = $holiday['end'];
-			if ( $start < $now && $end > $now ) {
+			if ( $start <= $now && $end => $now ) {
 				return false;
 			}
 		}
