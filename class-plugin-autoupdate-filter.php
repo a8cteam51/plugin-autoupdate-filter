@@ -25,6 +25,24 @@ class Plugin_Autoupdate_Filter {
 	// setup plugins to autoupdate _unless_ it's during specific day/time
 	public function auto_update_specific_times( $update, $item ) {
 
+		$holidays = array(
+			'christmas' => array(
+				'start' => '2021-12-23 00:00:00',
+				'end'   => '2021-12-26 00:00:00',
+			),
+		);
+		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
+
+		$now = gmdate("Y-m-d H:i:s");
+
+		foreach ( $holidays as $holiday ) {
+			$start = $holiday['start'];
+			$end   = $holiday['end'];
+			if ( $start <= $now && $end => $now ) {
+				return false;
+			}
+		}
+
 		$hours = array(
 			'start'      => '10', // 6am Eastern
 			'end'        => '23', // 7pm Eastern
@@ -42,7 +60,7 @@ class Plugin_Autoupdate_Filter {
 		$day  = gmdate( 'D' );  // Current day of the week
 
 		// If outside business hours, disable auto-updates
-		if ( $hour < $hours[ 'start' ] || $hour > $hours[ 'end' ] || in_array( $day, $days_off, true ) || ( 'Fri' === $day && $hour > $hours[ 'friday_end' ] ) ) {
+		if ( $hour < $hours['start'] || $hour > $hours['end'] || in_array( $day, $days_off, true ) || ( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
 			return false;
 		}
 

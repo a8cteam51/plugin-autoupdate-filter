@@ -46,6 +46,17 @@ function custom_autoupdate_days_off( $days_off ) {
 }
 add_filter( 'plugin_autoupdate_filter_days_off', 'custom_autoupdate_days_off' );
 ```
+### Set holidays
+If you'd like to set windows of time for no updates, you can filter them. e.g.:
+```
+$holidays = array(
+  'christmas' => array(
+    'start' => '2021-12-23 00:00:00',
+    'end'   => '2021-12-26 00:00:00'
+  ),
+);
+add_filter( 'plugin_autoupdate_filter_holidays', 'custom_autoupdate_holidays' );
+```
 
 ### Disable autoupdate completely for specific plugins
 If you still need to turn off autoupdates for a specific plugin, you can filter `auto_update_plugin` at a priority greater than 10, and prevent specific plugins from updating. e.g.:
