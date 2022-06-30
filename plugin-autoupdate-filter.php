@@ -7,6 +7,7 @@ Version: 1.1.0
 Author: WordPress.com Special Projects / Nick Green
 Author URI: https://wpspecialprojects.wordpress.com/
 License: GPLv3
+Network: true
 */
 
 
