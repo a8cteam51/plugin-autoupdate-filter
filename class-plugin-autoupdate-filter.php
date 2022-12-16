@@ -20,6 +20,15 @@ class Plugin_Autoupdate_Filter {
 			3
 		);
 
+		// Always send auto-update emails to T51 concierge email address
+		add_filter( 'auto_plugin_theme_update_email', 'plugin_autoupdate_filter_custom_update_emails', 4, 10 );
+
+		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
+		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
+		add_filter( 'auto_core_update_send_email', '__return_true', 11 );
+		add_filter( 'auto_plugin_update_send_email', '__return_true', 11 );
+		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
+
 	}
 
 	// setup plugins to autoupdate _unless_ it's during specific day/time
@@ -68,5 +77,10 @@ class Plugin_Autoupdate_Filter {
 			return true;
 	}
 
+	// Always send auto-update emails to T51
+	public function plugin_autoupdate_filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
+		$email['to'] = 'concierge@wordpress.com';
+		return $email;
+	}
 }
 new Plugin_Autoupdate_Filter();
