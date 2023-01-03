@@ -42,7 +42,7 @@ class Plugin_Autoupdate_Filter {
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
 
-		$now = gmdate("Y-m-d H:i:s");
+		$now = gmdate( 'Y-m-d H:i:s' );
 
 		foreach ( $holidays as $holiday ) {
 			$start = $holiday['start'];
