@@ -21,7 +21,7 @@ require_once dirname( __FILE__ ) . '/class-plugin-autoupdate-filter.php';
 // sets up autoupdates for this plugin, even though it's hosted on GitHub
 add_filter( 'update_plugins_github.com', function( $update, array $plugin_data, string $plugin_file, $locales ) {
     // only check this plugin
-    if ( $plugin_file !== 'plugin-autoupdate-filter.php' ) {
+    if ( $plugin_file !== 'plugin-autoupdate-filter/plugin-autoupdate-filter.php' ) {
         return $update;
     }
 
