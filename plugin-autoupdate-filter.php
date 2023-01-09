@@ -18,37 +18,48 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once dirname( __FILE__ ) . '/class-plugin-autoupdate-filter.php';
 
-// sets up autoupdates for this plugin, even though it's hosted on GitHub
-add_filter( 'update_plugins_github.com', function( $update, array $plugin_data, string $plugin_file, $locales ) {
-    // only check this plugin
-    if ( $plugin_file !== 'plugin-autoupdate-filter/plugin-autoupdate-filter.php' ) {
-        return $update;
-    }
+// sets up autoupdates for this GitHub-hosted plugin
+add_filter(
+	'update_plugins_github.com',
+	function( $update, array $plugin_data, string $plugin_file, $locales ) {
+		// only check this plugin
+		if ( 'plugin-autoupdate-filter/plugin-autoupdate-filter.php' !== $plugin_file ) {
+			return $update;
+		}
 
-    // already done update check elsewhere
-    if ( ! empty( $update ) ) {
-        return $update;
-    }
+		// already done update check elsewhere
+		if ( ! empty( $update ) ) {
+			return $update;
+		}
 
-	// let's go get the latest version number from GitHub 
-	$curl = curl_init();
-	curl_setopt( $curl, CURLOPT_URL, "https://api.github.com/repos/a8cteam51/plugin-autoupdate-filter/releases/latest" );  
-	curl_setopt( $curl, CURLOPT_USERAGENT, 'wpspecialprojects' );
-	curl_setopt( $curl, CURLOPT_RETURNTRANSFER, 1 );
-	$output = json_decode( curl_exec($curl), true );  
-	curl_close( $curl );
+		// let's go get the latest version number from GitHub
+		$response = wp_remote_get(
+			'https://api.github.com/repos/a8cteam51/plugin-autoupdate-filter/releases/latest',
+			array(
+				'user-agent' => 'wpspecialprojects',
+			)
+		);
 
-	$new_version_number  = $output['tag_name'];	
-	$is_update_available = version_compare( $plugin_data['Version'], $new_version_number, '<' );
+		if ( is_wp_error( $response ) ) {
+			return;
+		} else {
+			$output = json_decode( wp_remote_retrieve_body( $response ), true );
+		}
 
-    if ( ! $is_update_available ) {
-        return false;
-    }
+		$new_version_number  = $output['tag_name'];
+		$is_update_available = version_compare( $plugin_data['Version'], $new_version_number, '<' );
 
-    return [
-        'slug'    => 'plugin-autoupdate-filter',
-        'version' => $new_version_number,
-        'url'     => 'https://github.com/a8cteam51/plugin-autoupdate-filter/',
-        'package' => 'https://github.com/a8cteam51/plugin-autoupdate-filter/releases/latest/download/plugin-autoupdate-filter.zip',
-    ];
-}, 10, 4 );
+		if ( ! $is_update_available ) {
+			return false;
+		}
+
+		return array(
+			'slug'    => 'plugin-autoupdate-filter',
+			'version' => $new_version_number,
+			'url'     => 'https://github.com/a8cteam51/plugin-autoupdate-filter/',
+			'package' => 'https://github.com/a8cteam51/plugin-autoupdate-filter/releases/latest/download/plugin-autoupdate-filter.zip',
+		);
+	},
+	10,
+	4
+);
