@@ -1,27 +1,29 @@
 <?php
+/**
+ * Plugin Autoupdate Filter class
+ *
+ * @package Plugin_Autoupdate_Filter
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
 class Plugin_Autoupdate_Filter {
 
+	/**
+	 * Plugin_Autoupdate_Filter constructor.
+	 */
 	public function __construct() {
 
 		// setup plugins to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
-		add_filter(
-			'plugin_auto_update_setting_html',
-			function( $html, $plugin_file, $plugin_data ) {
-				return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
-			},
-			11,
-			3
-		);
+		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
 
 		// Always send auto-update emails to T51 concierge email address
-		add_filter( 'auto_plugin_theme_update_email', 'plugin_autoupdate_filter_custom_update_emails', 4, 10 );
+		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 4, 10 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
 		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
@@ -31,7 +33,14 @@ class Plugin_Autoupdate_Filter {
 
 	}
 
-	// setup plugins to autoupdate _unless_ it's during specific day/time
+	/**
+	 * Enable or disable plugin auto-updates based on time and day of the week.
+	 *
+	 * @param bool   $update Whether to update the plugin or not.
+	 * @param object $item   The plugin update object.
+	 *
+	 * @return bool True to update, false to not update.
+	 */
 	public function auto_update_specific_times( $update, $item ) {
 
 		$holidays = array(
@@ -77,10 +86,32 @@ class Plugin_Autoupdate_Filter {
 			return true;
 	}
 
-	// Always send auto-update emails to T51
+	/**
+	 * Customize auto-update email recipients.
+	 *
+	 * @param array  $email              Array of email data.
+	 * @param string $type               Type of email to send.
+	 * @param array  $successful_updates Array of successful updates.
+	 * @param array  $failed_updates     Array of failed updates.
+	 *
+	 * @return array Array of email data with modified recipient email.
+	 */
 	public function plugin_autoupdate_filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
+	}
+
+	/**
+	 * Customize automatic update setting HTML for plugins page in wp-admin.
+	 *
+	 * @param string $html       HTML for automatic update settings.
+	 * @param string $plugin_file Path to plugin file.
+	 * @param array  $plugin_data Array of plugin data.
+	 *
+	 * @return string Customized HTML for automatic update settings.
+	 */
+	public function plugin_autoupdate_filter_custom_setting_html( $html, $plugin_file, $plugin_data ) {
+		return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
 	}
 }
 new Plugin_Autoupdate_Filter();
