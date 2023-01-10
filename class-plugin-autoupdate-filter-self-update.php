@@ -65,7 +65,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		$new_package = $output['assets'][0]['browser_download_url'];
 
 		return array(
-			'slug'    => $plugin_data['Slug'],
+			'slug'    => $plugin_data['TextDomain'],
 			'version' => $new_version_number,
 			'url'     => $new_url,
 			'package' => $new_package,
