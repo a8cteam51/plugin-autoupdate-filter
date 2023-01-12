@@ -24,6 +24,7 @@ class Plugin_Autoupdate_Filter {
 
 		// Always send auto-update emails to T51 concierge email address
 		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 4, 10 );
+		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 3, 10 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
 		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
@@ -102,6 +103,19 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
+	 * Filters the recipient email address for plugin update failure notifications.
+	 * @param array $email The email details, including 'to', 'subject', 'body', 'headers'.
+	 * @param int $failures The number of failures encountered while upgrading.
+	 * @param mixed $update_results The results of all attempted updates.
+	 *
+	 * @return array $email The email details with the 'to' address modified.
+	 */
+	public function plugin_autoupdate_filter_custom_debug_email( $email, $failures, $update_results  ) {
+		$email['to'] = 'concierge@wordpress.com';
+		return $email;
+	}
+
+	/**
 	 * Customize automatic update setting HTML for plugins page in wp-admin.
 	 *
 	 * @param string $html       HTML for automatic update settings.
@@ -113,5 +127,6 @@ class Plugin_Autoupdate_Filter {
 	public function plugin_autoupdate_filter_custom_setting_html( $html, $plugin_file, $plugin_data ) {
 		return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
 	}
+
 }
 new Plugin_Autoupdate_Filter();
