@@ -110,7 +110,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array $email The email details with the 'to' address modified.
 	 */
-	public function plugin_autoupdate_filter_custom_debug_email( $email,   $failures,   $update_results ) {
+	public function plugin_autoupdate_filter_custom_debug_email( $email, $failures, $update_results ) {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
