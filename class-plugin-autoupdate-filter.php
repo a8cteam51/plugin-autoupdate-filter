@@ -23,8 +23,8 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
 
 		// Always send auto-update emails to T51 concierge email address
-		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 4, 10 );
-		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 3, 10 );
+		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 10, 3 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
 		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
