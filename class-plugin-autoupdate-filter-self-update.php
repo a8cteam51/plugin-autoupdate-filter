@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Plugin_Autoupdate_Filter_Self_Update {
 
 	/**
-	 * Plugin_Autoupdate_Filter_Self_Update constructor.
+	 * Initialize WordPress hooks
 	 */
-	public function __construct() {
+	public function init() {
 		add_filter( 'update_plugins_github.com', array( $this, 'self_update' ), 10, 4 );
 	}
 
@@ -72,4 +72,5 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		);
 	}
 }
-new Plugin_Autoupdate_Filter_Self_Update();
+$plugin_autoupdate_filter_self_update = new Plugin_Autoupdate_Filter_Self_Update();
+$plugin_autoupdate_filter_self_update->init();

@@ -12,9 +12,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Plugin_Autoupdate_Filter {
 
 	/**
-	 * Plugin_Autoupdate_Filter constructor.
+	 * Initialize WordPress hooks
 	 */
-	public function __construct() {
+	public function init() {
 
 		// setup plugins to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
@@ -129,4 +129,5 @@ class Plugin_Autoupdate_Filter {
 	}
 
 }
-new Plugin_Autoupdate_Filter();
+$plugin_autoupdate_filter = new Plugin_Autoupdate_Filter();
+$plugin_autoupdate_filter->init();
