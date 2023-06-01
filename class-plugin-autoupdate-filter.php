@@ -16,14 +16,16 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function init() {
 
-		// setup plugins to autoupdate _unless_ it's during specific day/time
+		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
+		add_filter( 'auto_update_core', array( $this, 'auto_update_specific_times' ), 10, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
 
 		// Always send auto-update emails to T51 concierge email address
 		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
 		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 10, 3 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
