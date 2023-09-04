@@ -18,7 +18,7 @@ class Plugin_Autoupdate_Filter {
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
-		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'auto_update_core', array( $this, 'auto_update_specific_times' ), 10, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
