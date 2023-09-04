@@ -59,7 +59,10 @@ add_filter( 'plugin_autoupdate_filter_holidays', 'custom_autoupdate_holidays' );
 ```
 
 ### Disable autoupdate completely for specific plugins
-If you still need to turn off autoupdates for a specific plugin, you can filter `auto_update_plugin` at a priority greater than 10, and prevent specific plugins from updating. e.g.:
+If you still need to turn off autoupdates for a specific plugin, you can filter `auto_update_plugin` at a priority greater than 10, and prevent specific plugins from updating.
+
+### NOTE: If you do this, please name your function `disable_autoupdate_specific_plugins`, so that we can add appropriate notices in wp-admin, e.g.
+
 ```
 function disable_autoupdate_specific_plugins ( $update, $item ) {
     // Array of plugin slugs to never auto-update
