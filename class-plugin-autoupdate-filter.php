@@ -16,14 +16,19 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function init() {
 
-		// setup plugins to autoupdate _unless_ it's during specific day/time
+		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
+		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
 
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
 
+		//Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
+		add_action( 'admin_init', array( $this, 'plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins' ) );
+
 		// Always send auto-update emails to T51 concierge email address
 		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
 		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 10, 3 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
@@ -31,8 +36,6 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_core_update_send_email', '__return_true', 11 );
 		add_filter( 'auto_plugin_update_send_email', '__return_true', 11 );
 		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
-
-		add_action( 'admin_init', array( $this, 'replace_upgrade_message_for_specific_plugins' ) );
 
 	}
 
@@ -148,7 +151,7 @@ class Plugin_Autoupdate_Filter {
 	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
 	 *
 	 */
-	public function replace_upgrade_message_for_specific_plugins() {
+	public function plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins() {
 
 		$all_plugins = get_plugins();
 
