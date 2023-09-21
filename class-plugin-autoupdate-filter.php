@@ -23,6 +23,9 @@ class Plugin_Autoupdate_Filter {
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
 
+		//Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
+		add_action( 'admin_init', array( $this, 'plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins' ) );
+
 		// Always send auto-update emails to T51 concierge email address
 		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
 		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
@@ -127,7 +130,65 @@ class Plugin_Autoupdate_Filter {
 	 * @return string Customized HTML for automatic update settings.
 	 */
 	public function plugin_autoupdate_filter_custom_setting_html( $html, $plugin_file, $plugin_data ) {
+
+		// check if updates are explicitly blocked for this plugin
+		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
+
+			// create a fake object to feed to disable_autoupdate_specific_plugins
+			$plugin_obj                    = new stdClass();
+			$plugin_obj->slug              = dirname( $plugin_file );
+			$plugin_allowed_to_update_bool = disable_autoupdate_specific_plugins( true, $plugin_obj );
+
+			if ( false === $plugin_allowed_to_update_bool ) {
+				return 'Autoupdates have been explicitly deactivated for this plugin.';
+			}
+		}
+
 		return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
+	}
+
+	/**
+	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
+	 *
+	 */
+	public function plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins() {
+
+		// check if updates are explicitly blocked for this plugin
+		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) ) {
+			return;
+		}
+
+		$all_plugins = get_plugins();
+
+		foreach ( $all_plugins as $plugin_file => $plugin_data ) {
+			// create a fake object to feed to disable_autoupdate_specific_plugins
+			$plugin_obj                    = new stdClass();
+			$slug                          = dirname( $plugin_file );
+			$plugin_obj->slug              = $slug;
+			$plugin_allowed_to_update_bool = disable_autoupdate_specific_plugins( true, $plugin_obj );
+			if ( false === $plugin_allowed_to_update_bool ) {
+				// add notice next to the "update now" link
+				add_filter(
+					"in_plugin_update_message-{$plugin_file}",
+					function () {
+						echo ' <strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for this plugin. Please contact the WordPress Special Projects team before manually updating.';
+					},
+					10,
+					2
+				);
+				// add notice to the top of the screen
+				global $pagenow;
+				if ( 'plugins.php' === $pagenow ) {
+					add_action(
+						'admin_notices',
+						function() use ( $slug ) {
+							echo '<div class="error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
+						}
+					);
+
+				}
+			}
+		}
 	}
 
 }
