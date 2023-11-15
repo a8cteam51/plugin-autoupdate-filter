@@ -51,8 +51,12 @@ class Plugin_Autoupdate_Filter {
 
 		$holidays = array(
 			'christmas' => array(
-				'start' => '2021-12-23 00:00:00',
-				'end'   => '2021-12-26 00:00:00',
+				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
+				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
+			),
+			'new_years' => array(
+				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
+				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
