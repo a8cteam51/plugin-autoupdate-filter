@@ -63,6 +63,10 @@ class Plugin_Autoupdate_Filter {
 				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
 				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
 			),
+			'wait_for_next_woo_release' => array(
+				'start' => gmdate( "Y" ) . '-02-16 00:00:00',
+				'end'   => gmdate( "Y" ) . '-02-21 23:59:59',
+			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
 
