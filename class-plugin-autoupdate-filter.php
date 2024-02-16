@@ -48,6 +48,11 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function auto_update_specific_times( $update, $item ) {
+		// Check if the plugin being updated is WooCommerce
+		if ( isset( $item->plugin ) && 'woocommerce/woocommerce.php' === $item->plugin ) {
+			// Explicitly prevent auto-updates for WooCommerce
+			return false;
+		}
 
 		$holidays = array(
 			'christmas' => array(
@@ -92,8 +97,8 @@ class Plugin_Autoupdate_Filter {
 			return false;
 		}
 
-			// Otherwise, plugins will autoupdate regardless of settings in wp-admin
-			return true;
+		// Otherwise, plugins will autoupdate regardless of settings in wp-admin
+		return true;
 	}
 
 	/**
