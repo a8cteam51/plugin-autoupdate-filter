@@ -48,9 +48,9 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function auto_update_specific_times( $update, $item ) {
-		// Check if the plugin being updated is WooCommerce
-		if ( isset( $item->plugin ) && 'woocommerce/woocommerce.php' === $item->plugin ) {
-			// Explicitly prevent auto-updates for WooCommerce
+		// Check if the plugin being updated has the slug 'woocommerce'
+		if ( isset( $item->slug ) && 'woocommerce' === $item->slug ) {
+			// Explicitly prevent auto-updates for WooCommerce by returning false
 			return false;
 		}
 
