@@ -49,7 +49,7 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function auto_update_specific_times( $update, $item ) {
 
-		$holidays = array(
+		$pause_periods = array(
 			'christmas' => array(
 				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
 				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
@@ -63,13 +63,16 @@ class Plugin_Autoupdate_Filter {
 				'end'   => '2024-02-20 23:59:59',
 			),
 		);
-		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
+		// leave this filter in for backward compatibility
+		$pause_periods = apply_filters( 'plugin_autoupdate_filter_holidays', $pause_periods );
+
+		$pause_periods = apply_filters( 'plugin_autoupdate_filter_pause_periods', $pause_periods );
 
 		$now = gmdate( 'Y-m-d H:i:s' );
 
-		foreach ( $holidays as $holiday ) {
-			$start = $holiday['start'];
-			$end   = $holiday['end'];
+		foreach ( $pause_periods as $pause_period ) {
+			$start = $pause_period['start'];
+			$end   = $pause_period['end'];
 			if ( $start <= $now && $now <= $end ) {
 				return false;
 			}
@@ -89,7 +92,7 @@ class Plugin_Autoupdate_Filter {
 		$days_off = apply_filters( 'plugin_autoupdate_filter_days_off', $days_off );
 
 		$hour = gmdate( 'H' ); // Current hour
-		$day  = gmdate( 'D' );  // Current day of the week
+		$day  = gmdate( 'D' ); // Current day of the week
 
 		// If outside business hours, disable auto-updates
 		if ( $hour < $hours['start'] || $hour > $hours['end'] || in_array( $day, $days_off, true ) || ( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
