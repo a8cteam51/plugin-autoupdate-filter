@@ -1,0 +1,24 @@
+{
+	"pause_all": false,
+	"pause_periods": [
+	  {
+		"name": "woo_update_6_1",
+		"start": "2024-02-16 00:00:00",
+		"end": "2024-02-20 23:59:59"
+	  }
+	],
+	"pause_times": {
+	  "start": "10",
+	  "end": "23",
+	  "friday_end": "19"
+	},
+	"pause_days": ["Sat", "Sun"],
+	"pause_plugins": [
+	  {
+		"slug": "woocommerce",
+		"skip_exact_version": "6.0",
+		"skip_version_higher_than_or_equal_to": "5.9",
+		"skip_version_lower_than": "6.1"
+	  }
+	]
+  }
