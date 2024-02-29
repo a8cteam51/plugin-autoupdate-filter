@@ -15,6 +15,8 @@ class Plugin_Autoupdate_Filter {
 	 * Initialize WordPress hooks
 	 */
 	public function init() {
+		// get centralized settings
+		$this->get_auto_update_settings();
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
@@ -37,6 +39,54 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_plugin_update_send_email', '__return_true', 11 );
 		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
 
+		// "Disable all autoupdates" toggle (killswitch)
+		add_filter( 'auto_update_plugin', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_core', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_theme', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
+		add_action( 'admin_init', array( $this, 'killswitch_engaged_admin_warning' ) );
+
+	}
+
+	/**
+	 * Load settings from the centralized settings page
+	 */
+	private function get_auto_update_settings() {
+		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wp-json/custom/v1/get_autoupdate_settings/';
+		$response     = wp_remote_get( $endpoint_url );
+	
+		if ( is_wp_error( $response ) ) {
+			return 'Error retrieving data: ' . $response->get_error_message();
+		}
+	
+		$body = wp_remote_retrieve_body( $response );
+		if ( empty( $body ) ) {
+			return 'Error: Empty response body';
+		}
+	
+		$data = json_decode( $body, true );
+	
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return 'Error decoding JSON: ' . json_last_error_msg();
+		}
+	
+		$this->settings = $data;
+	}
+
+	/**
+	 * If we have hit the "Disable all autoupdates" toggle switch, don't autoupdate anything.
+	 *
+	 * @param bool   $update Whether to update the plugin or not.
+	 * @param object $item   The plugin update object.
+	 *
+	 * @return bool True to update, false to not update.
+	 */
+	public function auto_update_killswitch( $update, $item ) {
+
+		if ( isset( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
+			return false;
+		}
+
+		return $update;
 	}
 
 	/**
@@ -57,10 +107,6 @@ class Plugin_Autoupdate_Filter {
 			'new_years' => array(
 				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
 				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
-			),
-			'wait_for_next_woo_release' => array(
-				'start' => '2024-02-16 00:00:00',
-				'end'   => '2024-02-20 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
@@ -196,6 +242,27 @@ class Plugin_Autoupdate_Filter {
 
 				}
 			}
+		}
+	}
+
+	/**
+	 * Big admin warning on plugins page if we've engaged the killswitch
+	 *
+	 */
+	public function killswitch_engaged_admin_warning() {
+		if ( ! isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+			return;
+		}
+		// add notice to the top of the screen
+		global $pagenow;
+		if ( 'plugins.php' === $pagenow && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
+			add_action(
+				'admin_notices',
+				function() {
+					echo '<div class="error"><p><strong style="color:red;"> Caution:</strong> All autoupdates are currently deactivated. Please contact the WordPress Special Projects team before manually updating.</p></div>';
+				}
+			);
+
 		}
 	}
 
