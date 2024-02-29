@@ -81,8 +81,11 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function auto_update_killswitch( $update, $item ) {
+		if ( ! isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+			return ;
+		}
 
-		if ( isset( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
+		if ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
 			return false;
 		}
 
