@@ -52,7 +52,7 @@ class Plugin_Autoupdate_Filter {
 	 * Load settings from the centralized settings page
 	 */
 	private function get_auto_update_settings() {
-		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wpcomsp/autoupdate-plugin/v1/settings/';
+		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/';
 		$response     = wp_remote_get( $endpoint_url );
 
 		// Check for `WP_Error`
@@ -103,7 +103,7 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function maybe_disable_all_autoupdates( $update, $item ) {
 
-		if ( $this->settings['error'] || ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+		if ( $this->settings['error'] || ( isset ( $this->settings['disable_all_toggle'] ) && 'on' === $this->settings['disable_all_toggle'] ) ) {
 			return false;
 		}
 
@@ -274,7 +274,7 @@ class Plugin_Autoupdate_Filter {
 		$message = '';
 		if ( $this->settings['error'] ) {
 			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ' ;
-		} elseif ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+		} elseif ( isset ( $this->settings['disable_all_toggle'] ) ) {
 			$message = 'All autoupdates are intentionally deactivated.';
 		}
 		// add notice to the top of the screen
