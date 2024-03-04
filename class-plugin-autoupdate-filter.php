@@ -23,15 +23,15 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_update_core', array( $this, 'auto_update_specific_times' ), 10, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
-		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
+		add_filter( 'plugin_auto_update_setting_html', array( $this, 'custom_setting_html' ), 11, 3 );
 
 		//Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
-		add_action( 'admin_init', array( $this, 'plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins' ) );
+		add_action( 'admin_init', array( $this, 'upgrade_message_for_specific_plugins' ) );
 
 		// Always send auto-update emails to T51 concierge email address
-		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
-		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
-		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 10, 3 );
+		add_filter( 'auto_plugin_theme_update_email', array( $this, 'custom_update_emails' ), 10, 4 );
+		add_filter( 'auto_core_update_email', array( $this, 'custom_update_emails' ), 10, 4 );
+		add_filter( 'automatic_updates_debug_email', array( $this, 'custom_debug_email' ), 10, 3 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
 		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
@@ -43,30 +43,51 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_core', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_theme', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
-		add_action( 'admin_init', array( $this, 'killswitch_engaged_admin_warning' ) );
+		add_action( 'admin_init', array( $this, 'autoupdate_settings_admin_notice' ) );
 
 	}
 
+	
 	/**
 	 * Load settings from the centralized settings page
 	 */
 	private function get_auto_update_settings() {
 		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wp-json/custom/v1/get_autoupdate_settings/';
 		$response     = wp_remote_get( $endpoint_url );
-	
+
+		// Check for `WP_Error`
 		if ( is_wp_error( $response ) ) {
-			return 'Error retrieving data: ' . $response->get_error_message();
+			$this->settings = [
+				'error' => $response->get_error_message(),
+			];
+			return;
 		}
 	
+		// Check for non-200 status code
+		$response_code = wp_remote_retrieve_response_code($response);
+		if ( 200 !== $response_code ) {
+			$this->settings = [
+				'error' => "HTTP request returned status code {$response_code}.",
+			];
+			return;
+		}
+	
+		// Check if response body exists and is not empty
 		$body = wp_remote_retrieve_body( $response );
 		if ( empty( $body ) ) {
-			return 'Error: Empty response body';
+			$this->settings = [
+				'error' => 'API returned an empty response body.',
+			];
+			return;
 		}
 	
+		// Try to decode JSON and check for errors
 		$data = json_decode( $body, true );
-	
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			return 'Error decoding JSON: ' . json_last_error_msg();
+			$this->settings = [
+				'error' => 'Failed to decode JSON: ' . json_last_error_msg(),
+			];
+			return;
 		}
 	
 		$this->settings = $data;
@@ -81,11 +102,8 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function auto_update_killswitch( $update, $item ) {
-		if ( ! isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
-			return ;
-		}
 
-		if ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
+		if ( $this->settings['error'] || ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
 			return false;
 		}
 
@@ -159,7 +177,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array Array of email data with modified recipient email.
 	 */
-	public function plugin_autoupdate_filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
+	public function custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -172,7 +190,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array $email The email details with the 'to' address modified.
 	 */
-	public function plugin_autoupdate_filter_custom_debug_email( $email, $failures, $update_results ) {
+	public function custom_debug_email( $email, $failures, $update_results ) {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -186,7 +204,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return string Customized HTML for automatic update settings.
 	 */
-	public function plugin_autoupdate_filter_custom_setting_html( $html, $plugin_file, $plugin_data ) {
+	public function custom_setting_html( $html, $plugin_file, $plugin_data ) {
 
 		// check if updates are explicitly blocked for this plugin
 		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -208,7 +226,7 @@ class Plugin_Autoupdate_Filter {
 	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
 	 *
 	 */
-	public function plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins() {
+	public function upgrade_message_for_specific_plugins() {
 
 		// check if updates are explicitly blocked for this plugin
 		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -239,7 +257,7 @@ class Plugin_Autoupdate_Filter {
 					add_action(
 						'admin_notices',
 						function() use ( $slug ) {
-							echo '<div class="error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
+							echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
 						}
 					);
 
@@ -249,20 +267,24 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * Big admin warning on plugins page if we've engaged the killswitch
+	 * Autoupdate filter settings admin notices 
 	 *
 	 */
-	public function killswitch_engaged_admin_warning() {
-		if ( ! isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
-			return;
+	public function autoupdate_settings_admin_notice() {
+		$message = '';
+		if ( $this->settings['error'] ) {
+			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ' ;
+		}
+		elseif ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+			$message = 'All autoupdates are intentionally deactivated.';
 		}
 		// add notice to the top of the screen
 		global $pagenow;
 		if ( 'plugins.php' === $pagenow && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
 			add_action(
 				'admin_notices',
-				function() {
-					echo '<div class="error"><p><strong style="color:red;"> Caution:</strong> All autoupdates are currently deactivated. Please contact the WordPress Special Projects team before manually updating.</p></div>';
+				function() use ( $message ) {
+					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong>' . $message . ' Please contact the WordPress Special Projects team before manually updating.</p></div>';
 				}
 			);
 
