@@ -40,9 +40,9 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
 
 		// "Disable all autoupdates" toggle (killswitch)
-		add_filter( 'auto_update_plugin', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
-		add_filter( 'auto_update_core', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
-		add_filter( 'auto_update_theme', array( $this, 'auto_update_killswitch' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_plugin', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_core', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_theme', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_action( 'admin_init', array( $this, 'autoupdate_settings_admin_notice' ) );
 
 	}
@@ -52,7 +52,7 @@ class Plugin_Autoupdate_Filter {
 	 * Load settings from the centralized settings page
 	 */
 	private function get_auto_update_settings() {
-		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wp-json/custom/v1/get_autoupdate_settings/';
+		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wpcomsp/autoupdate-plugin/v1/settings/';
 		$response     = wp_remote_get( $endpoint_url );
 
 		// Check for `WP_Error`
@@ -94,14 +94,14 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * If we have hit the "Disable all autoupdates" toggle switch, don't autoupdate anything.
+	 * If we have hit the "Disable all autoupdates" toggle switch, or if we can't get the centralized settings, don't autoupdate anything.
 	 *
 	 * @param bool   $update Whether to update the plugin or not.
 	 * @param object $item   The plugin update object.
 	 *
 	 * @return bool True to update, false to not update.
 	 */
-	public function auto_update_killswitch( $update, $item ) {
+	public function maybe_disable_all_autoupdates( $update, $item ) {
 
 		if ( $this->settings['error'] || ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
 			return false;
@@ -274,17 +274,16 @@ class Plugin_Autoupdate_Filter {
 		$message = '';
 		if ( $this->settings['error'] ) {
 			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ' ;
-		}
-		elseif ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
+		} elseif ( isset ( $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) ) {
 			$message = 'All autoupdates are intentionally deactivated.';
 		}
 		// add notice to the top of the screen
 		global $pagenow;
-		if ( 'plugins.php' === $pagenow && 'on' === $this->settings['team51_autoupdate_settings_disable_all_toggle'] ) {
+		if ( 'plugins.php' === $pagenow && '' !== $message ) {
 			add_action(
 				'admin_notices',
 				function() use ( $message ) {
-					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong>' . $message . ' Please contact the WordPress Special Projects team before manually updating.</p></div>';
+					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> ' . $message . ' Please contact the WordPress Special Projects team before manually updating plugins.</p></div>';
 				}
 			);
 
