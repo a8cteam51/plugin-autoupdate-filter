@@ -16,20 +16,14 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function init(): void {
 
+		// get the centralized settings from opsoasis
 		$this->settings = $this->get_auto_update_settings();
 		if ( is_wp_error( $this->settings ) ) {
 
-			error_log( "❌ Plugin Autoupdate Filter API Error: { $this->settings->get_error_code() } { $this->settings->get_error_message() }" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			add_action(
-				'admin_notices',
-				function() {
-					$message = $this->settings->get_error_message();
-					printf( '<div class="notice notice-error"><p>%1$s</p></div>', esc_html( $message ) );
-				}
-			);
+			$error_message  = $this->settings->get_error_code() . ": " . $this->settings->get_error_message();
+			$this->settings = (object) array( 'error' => $error_message );
 
-			// Disable all updates.
-			$this->settings = (object) array( 'disable_all' => true );
+			error_log( "Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings ({$error_message})");
 		}
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
@@ -60,8 +54,7 @@ class Plugin_Autoupdate_Filter {
 		add_action( 'admin_init', array( $this, 'autoupdate_settings_admin_notice' ) );
 
 	}
-
-
+	
 	/**
 	 * Load settings from the centralized settings page
 	 */
@@ -69,13 +62,13 @@ class Plugin_Autoupdate_Filter {
 
 		$response = wp_remote_get(
 			'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
-			array( 'headers' => array( 'Accept' => 'application/json' ) )
+			array( 'headers' => array( 'Accept' => 'application/json') )
 		);
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
-
+	
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
 
@@ -89,7 +82,15 @@ class Plugin_Autoupdate_Filter {
 		try {
 			$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
 		} catch ( JsonException $exception ) {
+			error_log( print_r( $exception, true ) );
 			return new WP_Error( $exception->getCode(), $exception->getMessage(), $exception );
+		}
+
+		// if the settings are empty, we still need to return an object
+		if ( !is_object( $decoded_body ) ) {
+			$object              = new stdClass();
+			$object->placeholder = $decoded_body;
+			$decoded_body        = $object;
 		}
 
 		return $decoded_body;
@@ -101,11 +102,11 @@ class Plugin_Autoupdate_Filter {
 	 * @param bool   $update Whether to update the plugin or not.
 	 * @param object $item   The plugin update object.
 	 *
-	 * @return bool True to update, false to not update. This is confusing, I know. We've discussed it at length.
+	 * @return bool True to update, false to not update.
 	 */
 	public function maybe_disable_all_autoupdates( $update, $item ): bool {
 
-		if ( ( isset( $this->settings['disable_all'] ) && 'disable_all' === $this->settings['disable_all'] ) ) {
+		if ( isset ( $this->settings->disable_all ) || isset ( $this->settings->error ) ) {
 			return false;
 		}
 
@@ -124,12 +125,12 @@ class Plugin_Autoupdate_Filter {
 
 		$holidays = array(
 			'christmas' => array(
-				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
-				'end'   => gmdate( 'Y' ) . '-12-31 23:59:59',
+				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
+				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
 			),
 			'new_years' => array(
-				'start' => gmdate( 'Y' ) . '-01-01 00:00:00',
-				'end'   => gmdate( 'Y' ) . '-01-02 23:59:59',
+				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
+				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
@@ -269,15 +270,15 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * Autoupdate filter settings admin notices
+	 * Autoupdate filter settings admin notices 
 	 *
 	 */
 	public function autoupdate_settings_admin_notice(): void {
 		$message = '';
-		if ( $this->settings['error'] ) {
-			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ';
-		} elseif ( isset( $this->settings['disable_all'] ) ) {
-			$message = 'All autoupdates are deactivated.';
+		if ( isset ( $this->settings->error ) ) {
+			$message = 'Error retrieving autoupdate settings (' . $this->settings->error . '). ' ;
+		} elseif ( isset ( $this->settings->disable_all ) ) {
+			$message .= 'All automatic updates are deactivated.';
 		}
 		// add notice to the top of the screen
 		global $pagenow;
