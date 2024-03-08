@@ -14,9 +14,23 @@ class Plugin_Autoupdate_Filter {
 	/**
 	 * Initialize WordPress hooks
 	 */
-	public function init() {
-		// get centralized settings
-		$this->get_auto_update_settings();
+	public function init(): void {
+
+		$this->settings = $this->get_auto_update_settings();
+		if ( is_wp_error( $this->settings ) ) {
+
+			error_log( "❌ Plugin Autoupdate Filter API Error: { $this->settings->get_error_code() } { $this->settings->get_error_message() }" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			add_action(
+				'admin_notices',
+				function() {
+					$message = $this->settings->get_error_message();
+					printf( '<div class="notice notice-error"><p>%1$s</p></div>', esc_html( $message ) );
+				}
+			);
+
+			// Disable all updates.
+			$this->settings = (object) array( 'disable_all' => true );
+		}
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
@@ -47,50 +61,38 @@ class Plugin_Autoupdate_Filter {
 
 	}
 
-	
+
 	/**
 	 * Load settings from the centralized settings page
 	 */
-	private function get_auto_update_settings() {
-		$endpoint_url = 'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/';
-		$response     = wp_remote_get( $endpoint_url );
+	private function get_auto_update_settings(): stdClass|WP_Error {
 
-		// Check for `WP_Error`
+		$response = wp_remote_get(
+			'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
+			array( 'headers' => array( 'Accept' => 'application/json' ) )
+		);
+
 		if ( is_wp_error( $response ) ) {
-			$this->settings = [
-				'error' => $response->get_error_message(),
-			];
-			return;
+			return $response;
 		}
-	
-		// Check for non-200 status code
-		$response_code = wp_remote_retrieve_response_code($response);
-		if ( 200 !== $response_code ) {
-			$this->settings = [
-				'error' => "HTTP request returned status code {$response_code}.",
-			];
-			return;
+
+		$response_code = wp_remote_retrieve_response_code( $response );
+		$response_body = wp_remote_retrieve_body( $response );
+
+		// Check that the response code is a 2xx code.
+		if ( ! \str_starts_with( (string) $response_code, '2' ) ) {
+			$response_message = wp_remote_retrieve_response_message( $response );
+			return new WP_Error( $response_code, $response_message, $response_body );
 		}
-	
-		// Check if response body exists and is not empty
-		$body = wp_remote_retrieve_body( $response );
-		if ( empty( $body ) ) {
-			$this->settings = [
-				'error' => 'API returned an empty response body.',
-			];
-			return;
+
+		// Parse the response body as JSON.
+		try {
+			$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
+		} catch ( JsonException $exception ) {
+			return new WP_Error( $exception->getCode(), $exception->getMessage(), $exception );
 		}
-	
-		// Try to decode JSON and check for errors
-		$data = json_decode( $body, true );
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			$this->settings = [
-				'error' => 'Failed to decode JSON: ' . json_last_error_msg(),
-			];
-			return;
-		}
-	
-		$this->settings = $data;
+
+		return $decoded_body;
 	}
 
 	/**
@@ -99,11 +101,11 @@ class Plugin_Autoupdate_Filter {
 	 * @param bool   $update Whether to update the plugin or not.
 	 * @param object $item   The plugin update object.
 	 *
-	 * @return bool True to update, false to not update.
+	 * @return bool True to update, false to not update. This is confusing, I know. We've discussed it at length.
 	 */
-	public function maybe_disable_all_autoupdates( $update, $item ) {
+	public function maybe_disable_all_autoupdates( $update, $item ): bool {
 
-		if ( $this->settings['error'] || ( isset ( $this->settings['disable_all_toggle'] ) && 'on' === $this->settings['disable_all_toggle'] ) ) {
+		if ( ( isset( $this->settings['disable_all'] ) && 'disable_all' === $this->settings['disable_all'] ) ) {
 			return false;
 		}
 
@@ -118,16 +120,16 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return bool True to update, false to not update.
 	 */
-	public function auto_update_specific_times( $update, $item ) {
+	public function auto_update_specific_times( $update, $item ): bool {
 
 		$holidays = array(
 			'christmas' => array(
-				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
-				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
+				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-12-31 23:59:59',
 			),
 			'new_years' => array(
-				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
-				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
+				'start' => gmdate( 'Y' ) . '-01-01 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-01-02 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
@@ -177,7 +179,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array Array of email data with modified recipient email.
 	 */
-	public function custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
+	public function custom_update_emails( $email, $type, $successful_updates, $failed_updates ): array {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -190,7 +192,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array $email The email details with the 'to' address modified.
 	 */
-	public function custom_debug_email( $email, $failures, $update_results ) {
+	public function custom_debug_email( $email, $failures, $update_results ): array {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -204,7 +206,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return string Customized HTML for automatic update settings.
 	 */
-	public function custom_setting_html( $html, $plugin_file, $plugin_data ) {
+	public function custom_setting_html( $html, $plugin_file, $plugin_data ): string {
 
 		// check if updates are explicitly blocked for this plugin
 		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -226,7 +228,7 @@ class Plugin_Autoupdate_Filter {
 	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
 	 *
 	 */
-	public function upgrade_message_for_specific_plugins() {
+	public function upgrade_message_for_specific_plugins(): void {
 
 		// check if updates are explicitly blocked for this plugin
 		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -267,15 +269,15 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * Autoupdate filter settings admin notices 
+	 * Autoupdate filter settings admin notices
 	 *
 	 */
-	public function autoupdate_settings_admin_notice() {
+	public function autoupdate_settings_admin_notice(): void {
 		$message = '';
 		if ( $this->settings['error'] ) {
-			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ' ;
-		} elseif ( isset ( $this->settings['disable_all_toggle'] ) ) {
-			$message = 'All autoupdates are intentionally deactivated.';
+			$message = 'Error retrieving autoupdate settings (' . $this->settings['error'] . '). ';
+		} elseif ( isset( $this->settings['disable_all'] ) ) {
+			$message = 'All autoupdates are deactivated.';
 		}
 		// add notice to the top of the screen
 		global $pagenow;
