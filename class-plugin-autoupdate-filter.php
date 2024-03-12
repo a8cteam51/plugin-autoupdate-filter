@@ -17,13 +17,20 @@ class Plugin_Autoupdate_Filter {
 	public function init(): void {
 
 		// get the centralized settings from opsoasis
-		$this->settings = $this->get_auto_update_settings();
-		if ( is_wp_error( $this->settings ) ) {
+		try {
+			$this->settings = $this->get_auto_update_settings();
+		} catch ( Exception $exception ) {
 
-			$error_message  = $this->settings->get_error_code() . ": " . $this->settings->get_error_message();
-			$this->settings = (object) array( 'error' => $error_message );
+			$error_message  = $exception->getMessage();
+			$this->settings = (object) array( 'disable_all' => true );
 
-			error_log( "Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings ({$error_message})");
+			error_log( "Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings ({$error_message})" ); // phpcs:disable WordPress.PHP.DevelopmentFunctions
+			add_action(
+				'admin_notices',
+				function() use ( $error_message ) {
+					echo '<div class="notice notice-error"><p><strong> Plugin Autoupdate Filter:</strong> Unable to get autoupdate settings (' . esc_html( $error_message ) . ').</p></div>';
+				}
+			);
 		}
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
@@ -47,14 +54,14 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_plugin_update_send_email', '__return_true', 11 );
 		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
 
-		// "Disable all autoupdates" toggle (killswitch)
+		// "Disable all autoupdates" toggle
 		add_filter( 'auto_update_plugin', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_core', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_theme', array( $this, 'maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_action( 'admin_init', array( $this, 'autoupdate_settings_admin_notice' ) );
 
 	}
-	
+
 	/**
 	 * Load settings from the centralized settings page
 	 */
@@ -62,32 +69,26 @@ class Plugin_Autoupdate_Filter {
 
 		$response = wp_remote_get(
 			'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
-			array( 'headers' => array( 'Accept' => 'application/json') )
+			array( 'headers' => array( 'Accept' => 'application/json' ) )
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return $response;
+			throw new RuntimeException( $response->get_error_message(), $response->get_error_code() );
 		}
-	
+
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
 
 		// Check that the response code is a 2xx code.
 		if ( ! \str_starts_with( (string) $response_code, '2' ) ) {
 			$response_message = wp_remote_retrieve_response_message( $response );
-			return new WP_Error( $response_code, $response_message, $response_body );
+			throw new Exception( $response_message, $response_code );
 		}
 
-		// Parse the response body as JSON.
-		try {
-			$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
-		} catch ( JsonException $exception ) {
-			error_log( print_r( $exception, true ) );
-			return new WP_Error( $exception->getCode(), $exception->getMessage(), $exception );
-		}
+		$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
 
 		// if the settings are empty, we still need to return an object
-		if ( !is_object( $decoded_body ) ) {
+		if ( ! is_object( $decoded_body ) ) {
 			$object              = new stdClass();
 			$object->placeholder = $decoded_body;
 			$decoded_body        = $object;
@@ -106,7 +107,7 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function maybe_disable_all_autoupdates( $update, $item ): bool {
 
-		if ( isset ( $this->settings->disable_all ) || isset ( $this->settings->error ) ) {
+		if ( isset( $this->settings->disable_all ) ) {
 			return false;
 		}
 
@@ -125,12 +126,12 @@ class Plugin_Autoupdate_Filter {
 
 		$holidays = array(
 			'christmas' => array(
-				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
-				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
+				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-12-31 23:59:59',
 			),
 			'new_years' => array(
-				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
-				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
+				'start' => gmdate( 'Y' ) . '-01-01 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-01-02 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
@@ -232,7 +233,8 @@ class Plugin_Autoupdate_Filter {
 	public function upgrade_message_for_specific_plugins(): void {
 
 		// check if updates are explicitly blocked for this plugin
-		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) ) {
+		// don't show if we are already disabling all updates
+		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) || isset( $this->settings->disable_all ) ) {
 			return;
 		}
 
@@ -270,23 +272,17 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * Autoupdate filter settings admin notices 
+	 * Autoupdate filter settings admin notices
 	 *
 	 */
 	public function autoupdate_settings_admin_notice(): void {
-		$message = '';
-		if ( isset ( $this->settings->error ) ) {
-			$message = 'Error retrieving autoupdate settings (' . $this->settings->error . '). ' ;
-		} elseif ( isset ( $this->settings->disable_all ) ) {
-			$message .= 'All automatic updates are deactivated.';
-		}
 		// add notice to the top of the screen
 		global $pagenow;
-		if ( 'plugins.php' === $pagenow && '' !== $message ) {
+		if ( 'plugins.php' === $pagenow && isset( $this->settings->disable_all ) ) {
 			add_action(
 				'admin_notices',
-				function() use ( $message ) {
-					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> ' . $message . ' Please contact the WordPress Special Projects team before manually updating plugins.</p></div>';
+				function() {
+					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> All automatic updates are deactivated. Please contact the WordPress Special Projects team before manually updating plugins.</p></div>';
 				}
 			);
 
