@@ -92,15 +92,15 @@ class Plugin_Autoupdate_Filter {
 
 			$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
 
-			// Save the settings in a transient for 5 minutes
-			set_transient( $transient_key, $decoded_body, 5 * MINUTE_IN_SECONDS );
-
 			// if the settings are empty, we still need to return an object
 			if ( ! is_object( $decoded_body ) ) {
 				$object              = new stdClass();
 				$object->placeholder = $decoded_body;
 				$decoded_body        = $object;
 			}
+
+			// Save the settings in a transient for 5 minutes
+			set_transient( $transient_key, $decoded_body, 5 * MINUTE_IN_SECONDS );
 
 			$settings = $decoded_body;
 		}
