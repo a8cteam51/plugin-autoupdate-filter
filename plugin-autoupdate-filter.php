@@ -2,8 +2,8 @@
 /*
 Plugin Name: Plugin Autoupdate Filter
 Plugin URI: https://github.com/a8cteam51/plugin-autoupdate-filter
-Description: Sets plugin automatic updates to always on, but only happen during specific days and times.
-Version: 1.4.6
+Description: Filters whether autoupdates are on based on day/time and other settings.
+Version: 1.5.0
 Author: WordPress.com Special Projects
 Author URI: https://wpspecialprojects.wordpress.com/
 Update URI: https://github.com/a8cteam51/plugin-autoupdate-filter/
