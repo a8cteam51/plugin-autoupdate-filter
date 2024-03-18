@@ -71,7 +71,7 @@ class Plugin_Autoupdate_Filter {
 		$transient_key = 'auto_update_settings';
 		$settings      = get_transient( $transient_key );
 
-		if ( false === $settings ) {
+		if ( false === $settings || "" === $settings ) {
 			$response = wp_safe_remote_get(
 				'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
 				array( 'headers' => array( 'Accept' => 'application/json' ) )
