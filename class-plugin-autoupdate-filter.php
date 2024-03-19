@@ -68,10 +68,10 @@ class Plugin_Autoupdate_Filter {
 	private function get_auto_update_settings(): stdClass {
 
 		// Try getting the settings from the transient first
-		$transient_key = 'auto_update_settings';
+		$transient_key = 'wpcpmsp_auto_update_settings';
 		$settings      = get_transient( $transient_key );
 
-		if ( false === $settings || "" === $settings ) {
+		if ( empty( $settings ) ) {
 			$response = wp_safe_remote_get(
 				'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
 				array( 'headers' => array( 'Accept' => 'application/json' ) )
