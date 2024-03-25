@@ -3,7 +3,7 @@
 Plugin Name: Plugin Autoupdate Filter
 Plugin URI: https://github.com/a8cteam51/plugin-autoupdate-filter
 Description: Filters whether autoupdates are on based on day/time and other settings.
-Version: 1.5.1
+Version: 1.5.2
 Author: WordPress.com Special Projects
 Author URI: https://wpspecialprojects.wordpress.com/
 Update URI: https://github.com/a8cteam51/plugin-autoupdate-filter/
