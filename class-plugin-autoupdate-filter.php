@@ -111,12 +111,12 @@ class Plugin_Autoupdate_Filter {
 	/**
 	 * If we have hit the "Disable all autoupdates" toggle switch, or if we can't get the centralized settings, don't autoupdate anything.
 	 *
-	 * @param bool   $update Whether to update the plugin or not.
+	 * @param bool|null   $update Whether to update the plugin or not. This can be bool or null as per the docs
 	 * @param object $item   The plugin update object.
 	 *
-	 * @return bool True to update, false to not update.
+	 * @return bool|null True to update, false to not update.
 	 */
-	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
+	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool|null {
 
 		if ( isset( $this->settings->disable_all ) ) {
 			return false;
