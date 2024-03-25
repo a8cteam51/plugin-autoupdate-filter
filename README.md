@@ -1,5 +1,13 @@
-# plugin-autoupdate-filter
-Sets plugin automatic updates to always on, but only happen during specific days and times.
+| :exclamation:  This is a public repository |
+|--------------------------------------------|
+
+# Plugin Autoupdate Filter
+Filters whether autoupdates are on based on day/time and other settings.
+
+## What's this?
+This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:
+1. It defaults autoupdates to be on. Keeping plugins up-to-date is one of the the first lines of defense against malicious attacks and technical debt.
+2. It provides various mechanisms by which we can turn off autoupdates, such as during specific days/times, for specific plugins, or centralized settings which can turn off all autoupdates.
 
 ## Usage
 
@@ -13,6 +21,10 @@ This plugin filters the core `auto_update_plugin` functionality to always run au
 It's a good idea to load this as a normal plugin (rather than an mu-plugin), so that it can be deactivated easily by a site admin, in case autoupdates needs to be paused during troubleshooting, etc.
 
 By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eastern, and Fri 6am-3pm Eastern. The 13 hour days are because the cron event which checks for autoupdates only runs every 12 hours, and so if the window isn't more than 12 hours at least once during the week, we run the risk of missing updates completely.
+
+### Centralized settings
+
+By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings. If you use this plugin and aren't part of the team, then we recommend you either set up your own endpoint or remove that portion of the code. 
 
 ## Support
 
@@ -61,7 +73,7 @@ add_filter( 'plugin_autoupdate_filter_holidays', 'custom_autoupdate_holidays' );
 ### Disable autoupdate completely for specific plugins
 If you still need to turn off autoupdates for a specific plugin, you can filter `auto_update_plugin` at a priority greater than 10, and prevent specific plugins from updating.
 
-### NOTE: If you do this, please name your function `disable_autoupdate_specific_plugins`, so that we can add appropriate notices in wp-admin, e.g.
+**NOTE: If you do this, please name your function `disable_autoupdate_specific_plugins`**, so that we can add appropriate notices in wp-admin, e.g.
 
 ```
 function disable_autoupdate_specific_plugins ( $update, $item ) {

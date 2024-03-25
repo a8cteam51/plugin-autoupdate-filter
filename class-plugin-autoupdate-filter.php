@@ -14,22 +14,39 @@ class Plugin_Autoupdate_Filter {
 	/**
 	 * Initialize WordPress hooks
 	 */
-	public function init() {
+	public function init(): void {
+
+		// get the centralized settings from opsoasis
+		try {
+			$this->settings = $this->get_auto_update_settings();
+		} catch ( Exception $exception ) {
+
+			$error_message  = $exception->getMessage();
+			$this->settings = (object) array( 'disable_all' => true );
+
+			error_log( "Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings ({$error_message})" ); // phpcs:disable WordPress.PHP.DevelopmentFunctions
+			add_action(
+				'admin_notices',
+				function() use ( $error_message ) {
+					echo '<div class="notice notice-error"><p><strong> Plugin Autoupdate Filter:</strong> Unable to get autoupdate settings (' . esc_html( $error_message ) . ').</p></div>';
+				}
+			);
+		}
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
-		add_filter( 'auto_update_plugin', array( $this, 'auto_update_specific_times' ), 10, 2 );
-		add_filter( 'auto_update_core', array( $this, 'auto_update_specific_times' ), 10, 2 );
+		add_filter( 'auto_update_plugin', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
+		add_filter( 'auto_update_core', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
-		add_filter( 'plugin_auto_update_setting_html', array( $this, 'plugin_autoupdate_filter_custom_setting_html' ), 11, 3 );
+		add_filter( 'plugin_auto_update_setting_html', array( $this, 'filter_custom_setting_html' ), 11, 3 );
 
 		//Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
-		add_action( 'admin_init', array( $this, 'plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins' ) );
+		add_action( 'admin_init', array( $this, 'output_upgrade_message_for_specific_plugins' ) );
 
 		// Always send auto-update emails to T51 concierge email address
-		add_filter( 'auto_plugin_theme_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
-		add_filter( 'auto_core_update_email', array( $this, 'plugin_autoupdate_filter_custom_update_emails' ), 10, 4 );
-		add_filter( 'automatic_updates_debug_email', array( $this, 'plugin_autoupdate_filter_custom_debug_email' ), 10, 3 );
+		add_filter( 'auto_plugin_theme_update_email', array( $this, 'filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'auto_core_update_email', array( $this, 'filter_custom_update_emails' ), 10, 4 );
+		add_filter( 'automatic_updates_debug_email', array( $this, 'filter_custom_debug_email' ), 10, 3 );
 
 		// re-enable core update emails which are disabled in an mu-plugin at the Atomic platform level
 		add_filter( 'automatic_updates_send_debug_email', '__return_true', 11 );
@@ -37,6 +54,75 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_plugin_update_send_email', '__return_true', 11 );
 		add_filter( 'auto_theme_update_send_email', '__return_true', 11 );
 
+		// "Disable all autoupdates" toggle
+		add_filter( 'auto_update_plugin', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_core', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
+		add_filter( 'auto_update_theme', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
+		add_action( 'admin_init', array( $this, 'output_auto_updates_disabled_admin_notice' ) );
+
+	}
+
+	/**
+	 * Load settings from the centralized settings page
+	 */
+	private function get_auto_update_settings(): stdClass {
+
+		// Try getting the settings from the transient first
+		$transient_key = 'wpcpmsp_auto_update_settings';
+		$settings      = get_transient( $transient_key );
+
+		if ( empty( $settings ) ) {
+			$response = wp_safe_remote_get(
+				'https://opsoasis.wpspecialprojects.com/wp-json/wpcomsp/autoupdate-plugin/v1/settings/',
+				array( 'headers' => array( 'Accept' => 'application/json' ) )
+			);
+
+			if ( is_wp_error( $response ) ) {
+				throw new RuntimeException( $response->get_error_message(), $response->get_error_code() );
+			}
+
+			$response_code = wp_remote_retrieve_response_code( $response );
+			$response_body = wp_remote_retrieve_body( $response );
+
+			// Check that the response code is a 2xx code.
+			if ( ! \str_starts_with( (string) $response_code, '2' ) ) {
+				$response_message = wp_remote_retrieve_response_message( $response );
+				throw new Exception( $response_message, $response_code );
+			}
+
+			$decoded_body = json_decode( $response_body, false, 512, JSON_THROW_ON_ERROR );
+
+			// if the settings are empty, we still need to return an object
+			if ( ! is_object( $decoded_body ) ) {
+				$object              = new stdClass();
+				$object->placeholder = $decoded_body;
+				$decoded_body        = $object;
+			}
+
+			// Save the settings in a transient for 5 minutes
+			set_transient( $transient_key, $decoded_body, 5 * MINUTE_IN_SECONDS );
+
+			$settings = $decoded_body;
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * If we have hit the "Disable all autoupdates" toggle switch, or if we can't get the centralized settings, don't autoupdate anything.
+	 *
+	 * @param bool   $update Whether to update the plugin or not.
+	 * @param object $item   The plugin update object.
+	 *
+	 * @return bool True to update, false to not update.
+	 */
+	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
+
+		if ( isset( $this->settings->disable_all ) ) {
+			return false;
+		}
+
+		return $update;
 	}
 
 	/**
@@ -47,20 +133,16 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return bool True to update, false to not update.
 	 */
-	public function auto_update_specific_times( $update, $item ) {
+	public function filter_auto_update_specific_times( $update, $item ): bool {
 
 		$holidays = array(
 			'christmas' => array(
-				'start' => gmdate( "Y" ) . '-12-23 00:00:00',
-				'end'   => gmdate( "Y" ) . '-12-31 23:59:59',
+				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-12-31 23:59:59',
 			),
 			'new_years' => array(
-				'start' => gmdate( "Y" ) . '-01-01 00:00:00',
-				'end'   => gmdate( "Y" ) . '-01-02 23:59:59',
-			),
-			'wait_for_next_woo_release' => array(
-				'start' => '2024-02-16 00:00:00',
-				'end'   => '2024-02-20 23:59:59',
+				'start' => gmdate( 'Y' ) . '-01-01 00:00:00',
+				'end'   => gmdate( 'Y' ) . '-01-02 23:59:59',
 			),
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
@@ -110,7 +192,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array Array of email data with modified recipient email.
 	 */
-	public function plugin_autoupdate_filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ) {
+	public function filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ): array {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -123,7 +205,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return array $email The email details with the 'to' address modified.
 	 */
-	public function plugin_autoupdate_filter_custom_debug_email( $email, $failures, $update_results ) {
+	public function filter_custom_debug_email( $email, $failures, $update_results ): array {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
@@ -137,7 +219,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return string Customized HTML for automatic update settings.
 	 */
-	public function plugin_autoupdate_filter_custom_setting_html( $html, $plugin_file, $plugin_data ) {
+	public function filter_custom_setting_html( $html, $plugin_file, $plugin_data ): string {
 
 		// check if updates are explicitly blocked for this plugin
 		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -159,10 +241,11 @@ class Plugin_Autoupdate_Filter {
 	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
 	 *
 	 */
-	public function plugin_autoupdate_filter_change_upgrade_message_for_specific_plugins() {
+	public function output_upgrade_message_for_specific_plugins(): void {
 
 		// check if updates are explicitly blocked for this plugin
-		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) ) {
+		// don't show if we are already disabling all updates
+		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) || isset( $this->settings->disable_all ) ) {
 			return;
 		}
 
@@ -190,12 +273,30 @@ class Plugin_Autoupdate_Filter {
 					add_action(
 						'admin_notices',
 						function() use ( $slug ) {
-							echo '<div class="error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
+							echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
 						}
 					);
 
 				}
 			}
+		}
+	}
+
+	/**
+	 * Autoupdates disabled admin notice
+	 *
+	 */
+	public function output_auto_updates_disabled_admin_notice(): void {
+		// add notice to the top of the screen
+		global $pagenow;
+		if ( 'plugins.php' === $pagenow && isset( $this->settings->disable_all ) ) {
+			add_action(
+				'admin_notices',
+				function() {
+					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> All automatic updates are deactivated. Please contact the WordPress Special Projects team before manually updating plugins.</p></div>';
+				}
+			);
+
 		}
 	}
 
