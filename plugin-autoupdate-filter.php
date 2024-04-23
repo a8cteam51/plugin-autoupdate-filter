@@ -15,6 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
+if ( defined( 'PLUGIN_AUTOUPDATE_FILTER_PATH' ) ) {
+	exit; // Exit if another copy of plugin is active
+}
+
+define( 'PLUGIN_AUTOUPDATE_FILTER_PATH', plugin_dir_path( __FILE__ ) );
+
 // main plugin functionality
 require_once dirname( __FILE__ ) . '/class-plugin-autoupdate-filter.php';
 
