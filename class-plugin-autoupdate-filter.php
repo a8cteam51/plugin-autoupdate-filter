@@ -78,7 +78,7 @@ class Plugin_Autoupdate_Filter {
 			);
 
 			if ( is_wp_error( $response ) ) {
-				throw new RuntimeException( $response->get_error_message(), $response->get_error_code() );
+				throw new RuntimeException( $response->get_error_message() );
 			}
 
 			$response_code = wp_remote_retrieve_response_code( $response );
