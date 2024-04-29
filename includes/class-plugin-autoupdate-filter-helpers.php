@@ -16,7 +16,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 *
 	 * @param string $plugin_slug Slug of the plugin.
 	 * @param string $update_version The version that the plugin would be updated to.
-	 * 
+	 *
 	 * @return bool True if the plugin should be updated, false otherwise.
 	 */
 	public function has_delay_passed( string $plugin_slug, string $update_version ): bool {
@@ -30,7 +30,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 
 		$installed_version_parts = explode( '.', $installed_version );
 		$update_version_parts    = explode( '.', $update_version );
-		
+
 		if ( 3 !== count( $installed_version_parts ) || 3 !== count( $update_version_parts ) ) {
 			return false;
 		}
@@ -54,7 +54,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * Retrieve the current version of an installed plugin.
 	 *
 	 * @param string $plugin_slug Slug of the plugin.
-	 * 
+	 *
 	 * @return string Current version of the plugin or an empty string if not found.
 	 */
 	public function get_installed_plugin_version( string $plugin_slug ): string {
@@ -64,7 +64,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 
 		$plugins = get_plugins();
 		foreach ( $plugins as $plugin_path => $plugin_info ) {
-			if ( $plugin_slug === dirname( $plugin_path ) ) {
+			if ( dirname( $plugin_path ) === $plugin_slug ) {
 				return $plugin_info['Version'];
 			}
 		}
@@ -78,7 +78,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @param string $plugin_slug Slug of the plugin.
 	 * @param string $update_version The version to update to.
 	 * @param int $delay_days Number of days to delay the update.
-	 * 
+	 *
 	 * @return int The Unix timestamp indicating when the plugin can be updated.
 	 */
 	public function get_delay_date( string $plugin_slug, string $update_version, int $delay_days ): int {
@@ -107,7 +107,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 */
 	public function get_plugin_release_date( string $plugin_slug ): int {
 		$response = wp_remote_get( "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug={$plugin_slug}" );
-		
+
 		if ( is_wp_error( $response ) ) {
 			return time();
 		}
