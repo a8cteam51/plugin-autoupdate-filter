@@ -106,7 +106,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return int The Unix timestamp of the release date or the current time if not available.
 	 */
 	public function get_plugin_release_date( string $plugin_slug ): int {
-		$response = wp_remote_get( "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug={$plugin_slug}" );
+		$response = wp_safe_remote_get( "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&slug={$plugin_slug}" );
 
 		if ( is_wp_error( $response ) ) {
 			return time();
