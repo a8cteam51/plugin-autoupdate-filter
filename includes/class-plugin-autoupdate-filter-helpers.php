@@ -31,10 +31,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 		$installed_version_parts = explode( '.', $installed_version );
 		$update_version_parts    = explode( '.', $update_version );
 
-		if ( 3 !== count( $installed_version_parts ) || 3 !== count( $update_version_parts ) ) {
-			return false;
-		}
-
 		// only apply delays to major and minor releases. let point releases (patches) go through.
 		if ( $installed_version_parts[0] !== $update_version_parts[0] || $installed_version_parts[1] !== $update_version_parts[1] ) {
 			$update_allowed_after = $this->get_delay_date( $plugin_slug, $update_version, $delay_days );
