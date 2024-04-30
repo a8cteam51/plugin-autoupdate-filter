@@ -138,7 +138,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @return bool True to update, false to not update.
 	 */
-	public function filter_enforce_autoupdate_delay( $update, $item ): bool {
+	public function filter_enforce_delay( $update, $item ): bool {
 		if ( true === $update ) {
 			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
 			$has_delay_passed = $helpers->has_delay_passed( $item->slug, $item->new_version );
