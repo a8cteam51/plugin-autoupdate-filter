@@ -20,8 +20,13 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return bool True if the plugin should be updated, false otherwise.
 	 */
 	public function has_delay_passed( string $plugin_slug, string $update_version ): bool {
-		// delay most plugins 2 days. delay woocommerce 7 days.
-		$delay_days        = 'woocommerce' === $plugin_slug ? 7 : 2;
+		// delay most plugins 2 days. delay some plugins 7 days.
+		$longer_delay_plugins = array(
+			'woocommerce',
+			'woocommerce-payments',
+		);
+
+		$delay_days        = in_array( $plugin_slug, $longer_delay_plugins, true ) ? 7 : 2;
 		$installed_version = $this->get_installed_plugin_version( $plugin_slug );
 
 		if ( empty( $installed_version ) || $update_version === $installed_version ) {
