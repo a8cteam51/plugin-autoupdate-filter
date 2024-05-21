@@ -139,6 +139,13 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_enforce_delay( $update, $item ): bool {
+		// no delay if site is a canary site
+		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true ) ) {
+			return $update;
+		}
+
+		// otherwise add delay to plugin updates
 		if ( true === $update ) {
 			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
 			$has_delay_passed = $helpers->has_delay_passed( $item->slug, $item->new_version );
