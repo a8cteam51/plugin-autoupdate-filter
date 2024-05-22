@@ -14,6 +14,11 @@ require_once 'includes/class-plugin-autoupdate-filter-helpers.php';
 class Plugin_Autoupdate_Filter {
 
 	/**
+	 * @var stdClass Holds the settings
+	 */
+	private $settings;
+
+	/**
 	 * Initialize WordPress hooks
 	 */
 	public function init(): void {
