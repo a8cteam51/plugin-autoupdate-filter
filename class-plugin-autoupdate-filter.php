@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
+require_once 'includes/class-plugin-autoupdate-filter-helpers.php';
+
 class Plugin_Autoupdate_Filter {
 
 	/**
@@ -36,6 +38,9 @@ class Plugin_Autoupdate_Filter {
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
 		add_filter( 'auto_update_plugin', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
 		add_filter( 'auto_update_core', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
+
+		// enforce a delay on all plugin autoupdates, based on release date
+		add_filter( 'auto_update_plugin', array( $this, 'filter_enforce_delay' ), 11, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'filter_custom_setting_html' ), 11, 3 );
@@ -126,7 +131,34 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
-	 * Enable or disable plugin auto-updates based on time and day of the week.
+	 * Disable plugin auto-updates based on if a delay has passed since plugin was released.
+	 *
+	 * @param bool   $update Whether to update the plugin or not.
+	 * @param object $item   The plugin update object.
+	 *
+	 * @return bool True to update, false to not update.
+	 */
+	public function filter_enforce_delay( $update, $item ): bool {
+		// no delay if site is a canary site
+		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true ) ) {
+			return $update;
+		}
+
+		// otherwise add delay to plugin updates
+		if ( true === $update ) {
+			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
+			$has_delay_passed = $helpers->has_delay_passed( $item->slug, $item->new_version );
+
+			if ( false === $has_delay_passed ) {
+				return false;
+			}
+		}
+		return $update;
+	}
+
+	/**
+	 * Disable auto-updates based on time and day of the week.
 	 *
 	 * @param bool   $update Whether to update the plugin or not.
 	 * @param object $item   The plugin update object.
@@ -134,7 +166,6 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_auto_update_specific_times( $update, $item ): bool {
-
 		$holidays = array(
 			'christmas' => array(
 				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
