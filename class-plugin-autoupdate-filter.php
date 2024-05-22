@@ -12,6 +12,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Plugin_Autoupdate_Filter {
 
 	/**
+	 * @var stdClass Holds the settings
+	 */
+	private $settings;
+
+	/**
 	 * Initialize WordPress hooks
 	 */
 	public function init(): void {
