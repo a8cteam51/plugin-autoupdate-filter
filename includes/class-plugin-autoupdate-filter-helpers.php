@@ -29,7 +29,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 		$delay_days        = in_array( $plugin_slug, $longer_delay_plugins, true ) ? 7 : 2;
 		$installed_version = $this->get_installed_plugin_version( $plugin_slug );
 
-		if ( empty( $installed_version ) || $update_version === $installed_version ) {
+		if ( empty( $installed_version ) || $update_version === $installed_version || '0.0.0' === $update_version ) {
 			return false;
 		}
 
