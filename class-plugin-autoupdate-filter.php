@@ -153,7 +153,8 @@ class Plugin_Autoupdate_Filter {
 		// otherwise add delay to plugin updates
 		if ( true === $update ) {
 			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
-			$has_delay_passed = $helpers->has_delay_passed( $item->slug, $item->new_version );
+			$new_version      = $item->new_version ?? '0.0.0'; // protect against null
+			$has_delay_passed = $helpers->has_delay_passed( $item->slug, $new_version );
 
 			if ( false === $has_delay_passed ) {
 				return false;
