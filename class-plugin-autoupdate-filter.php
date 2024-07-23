@@ -153,9 +153,10 @@ class Plugin_Autoupdate_Filter {
 		// otherwise add delay to plugin updates
 		if ( true === $update ) {
 			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
-			$slug             = $item->slug ?? 'no-slug'; // protect against null
+			$slug             = $item->slug ?? ''; // protect against null
+			$name             = $item->plugin;
 			$new_version      = $item->new_version ?? '0.0.0'; // protect against null
-			$has_delay_passed = $helpers->has_delay_passed( $slug, $new_version );
+			$has_delay_passed = $helpers->has_delay_passed( $slug, $new_version, $name );
 
 			if ( false === $has_delay_passed ) {
 				return false;
