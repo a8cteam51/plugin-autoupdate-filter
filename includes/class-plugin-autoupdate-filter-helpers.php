@@ -87,7 +87,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return  int The Unix timestamp indicating when the plugin can be updated.
 	 */
 	public function get_delay_date( string $plugin_slug, string $update_version, int $delay_days, string $plugin_file ): int {
-		$option_key = 'plugin_update_delay';
+		$option_key = 'plugin_update_delays';
 		$delays     = get_option( $option_key, array() );
 
 		if ( ! isset( $delays[ $plugin_file ][ $update_version ] ) ) {
@@ -137,7 +137,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return void
 	 */
 	public function clear_plugin_delay( string $plugin_name ): void {
-		$option_key = 'plugin_update_delay';
+		$option_key = 'plugin_update_delays';
 		$delays     = get_option( $option_key, array() );
 
 		if ( isset( $delays[ $plugin_name ] ) ) {
