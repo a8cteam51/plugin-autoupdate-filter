@@ -133,15 +133,16 @@ class Plugin_Autoupdate_Filter_Helpers {
 	/**
 	 * Clear out the entry for the plugin in the serialized array.
 	 *
-	 * @param string $plugin_name Slug of the plugin.
-	 * @return void
+	 * @param   string $plugin_file The relative path to the plugin file.
+	 *
+	 * @return  void
 	 */
-	public function clear_plugin_delay( string $plugin_name ): void {
+	public function clear_plugin_delay( string $plugin_file ): void {
 		$option_key = 'plugin_update_delays';
 		$delays     = get_option( $option_key, array() );
 
-		if ( isset( $delays[ $plugin_name ] ) ) {
-			unset( $delays[ $plugin_name ] );
+		if ( isset( $delays[ $plugin_file ] ) ) {
+			unset( $delays[ $plugin_file ] );
 			update_option( $option_key, $delays );
 		}
 	}
