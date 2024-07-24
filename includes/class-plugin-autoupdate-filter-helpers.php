@@ -137,7 +137,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return void
 	 */
 	public function clear_plugin_delay( string $plugin_name ): void {
-		$option_key = 'plugin_update_delay_2';
+		$option_key = 'plugin_update_delay';
 		$delays     = get_option( $option_key, array() );
 
 		if ( isset( $delays[ $plugin_name ] ) ) {
