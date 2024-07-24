@@ -152,7 +152,7 @@ class Plugin_Autoupdate_Filter {
 
 		// otherwise add delay to plugin updates
 		if ( true === $update ) {
-			$helpers          = new Plugin_Autoupdate_Filter_Helpers();
+			$helpers = new Plugin_Autoupdate_Filter_Helpers();
 
 			$plugin_file        = $item->plugin;
 			$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
@@ -160,9 +160,10 @@ class Plugin_Autoupdate_Filter {
 
 			$has_delay_passed = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
 			if ( false === $has_delay_passed ) {
-				return false;
+				$update = false;
 			}
 		}
+
 		return $update;
 	}
 
