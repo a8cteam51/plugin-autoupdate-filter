@@ -69,7 +69,6 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_update_core', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_theme', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_action( 'admin_init', array( $this, 'output_auto_updates_disabled_admin_notice' ) );
-
 	}
 
 	/**
@@ -154,7 +153,7 @@ class Plugin_Autoupdate_Filter {
 		if ( true === $update ) {
 			$helpers = new Plugin_Autoupdate_Filter_Helpers();
 
-			$plugin_file        = $item->plugin;
+			$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
 			$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
 			$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
 
@@ -340,7 +339,6 @@ class Plugin_Autoupdate_Filter {
 
 		}
 	}
-
 }
 $plugin_autoupdate_filter = new Plugin_Autoupdate_Filter();
 $plugin_autoupdate_filter->init();

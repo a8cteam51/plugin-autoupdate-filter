@@ -43,6 +43,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 		if ( $plugin_new_version === $installed_version ) {
 			return null;
 		}
+
 		if ( '0.0.0' === $installed_version || '0.0.0' === $plugin_new_version ) {
 			return false;
 		}
