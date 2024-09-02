@@ -163,6 +163,16 @@ class Plugin_Autoupdate_Filter {
 			}
 		}
 
+		// Make sure the plugin is included in auto-updates.
+		if ( true === $update ) {
+			$auto_updates = get_site_option( 'auto_update_plugins', array() );
+
+			if ( ! in_array( $plugin_file, $auto_updates ) ) {
+				$auto_updates[] = $plugin_file;
+				update_site_option('auto_update_plugins', $auto_updates);
+			}
+		}
+
 		return $update;
 	}
 
