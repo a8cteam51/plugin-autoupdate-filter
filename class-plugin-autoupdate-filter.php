@@ -69,6 +69,9 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_update_core', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_theme', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_action( 'admin_init', array( $this, 'output_auto_updates_disabled_admin_notice' ) );
+
+		// Clean-up delay data after a plugin is updated
+		add_action('upgrader_process_complete', array( $this, 'cleanup_plugin_delay_after_update_complete' ), 10, 2 );
 	}
 
 	/**
@@ -163,7 +166,7 @@ class Plugin_Autoupdate_Filter {
 			}
 		}
 
-		// Make sure the plugin is included in auto-updates.
+		// Make sure the plugin is included in auto-updates (on vs off).
 		if ( true === $update ) {
 			$auto_updates = get_site_option( 'auto_update_plugins', array() );
 
@@ -347,6 +350,25 @@ class Plugin_Autoupdate_Filter {
 				}
 			);
 
+		}
+	}
+
+	/**
+	 * Executes after a plugin has been updated.
+	 * Cleanup plugin delay data after update is complete.
+	 *
+	 * @param object $upgrader_object WP_Upgrader instance.
+	 * @param array  $options         Array of bulk item update data.
+	 */
+	public function cleanup_plugin_delay_after_update_complete( $upgrader_object, $options ) {
+		// Check if this is a plugin update.
+		if ( 'update' === $options['action'] && 'plugin' === $options['type'] ) {
+			if ( isset( $options['plugins'] ) ) {
+				$helpers = new Plugin_Autoupdate_Filter_Helpers();
+				foreach ( $options['plugins'] as $plugin ) {
+					$helpers->clear_plugin_delay( $plugin );
+				}
+			}
 		}
 	}
 }
