@@ -56,7 +56,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 			$update_allowed_after = $this->get_delay_date( $plugin_slug, $plugin_new_version, $delay_days, $plugin_file );
 
 			if ( time() >= $update_allowed_after ) {
-				$this->clear_plugin_delay( $plugin_file );
 				return true;
 			}
 
