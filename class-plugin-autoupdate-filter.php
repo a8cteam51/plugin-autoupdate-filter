@@ -71,7 +71,7 @@ class Plugin_Autoupdate_Filter {
 		add_action( 'admin_init', array( $this, 'output_auto_updates_disabled_admin_notice' ) );
 
 		// Clean-up delay data after a plugin is updated
-		add_action('upgrader_process_complete', array( $this, 'cleanup_plugin_delay_after_update_complete' ), 10, 2 );
+		add_action( 'upgrader_process_complete', array( $this, 'cleanup_plugin_delay_after_update_complete' ), 10, 2 );
 	}
 
 	/**
