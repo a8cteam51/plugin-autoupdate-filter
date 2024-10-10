@@ -170,12 +170,12 @@ class Plugin_Autoupdate_Filter {
 				// Get the site's date and time format settings.
 				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 				$formatted_date  = date_i18n( $datetime_format, $delay_date );
-				
+
 				// adds message to update notice box for that plugin on the plugins page
 				add_filter(
 					"in_plugin_update_message-{$plugin_file}",
 					function() use ( $plugin_new_version, $formatted_date ) {
-						echo ' Autoupdate to ' . $plugin_new_version . ' will be delayed until after ' . $formatted_date . ' UTC.' ;
+						echo ' Autoupdate to ' . esc_html( $plugin_new_version ) . ' will be delayed until after ' . esc_html( $formatted_date ) . ' UTC.';
 					},
 					10,
 					2
