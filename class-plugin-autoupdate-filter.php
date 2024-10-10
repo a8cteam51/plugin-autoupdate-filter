@@ -161,7 +161,25 @@ class Plugin_Autoupdate_Filter {
 			$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
 
 			$has_delay_passed = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
+
 			if ( false === $has_delay_passed ) {
+				$option_key = 'plugin_update_delays';
+				$delays     = get_option( $option_key, array() );
+				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
+
+				// Get the site's date and time format settings.
+				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+				$formatted_date  = date_i18n( $datetime_format, $delay_date );
+				
+				// adds message to update notice box for that plugin on the plugins page
+				add_filter(
+					"in_plugin_update_message-{$plugin_file}",
+					function() use ( $plugin_new_version, $formatted_date ) {
+						echo ' Autoupdate to ' . $plugin_new_version . ' will be delayed until after ' . $formatted_date . ' UTC.' ;
+					},
+					10,
+					2
+				);
 				$update = false;
 			}
 		}
