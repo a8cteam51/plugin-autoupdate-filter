@@ -152,7 +152,7 @@ class Plugin_Autoupdate_Filter {
 			return $update;
 		}
 
-		// otherwise add delay to plugin updates
+		// otherwise apply delay logic
 		if ( true === $update ) {
 			$helpers = new Plugin_Autoupdate_Filter_Helpers();
 
@@ -165,21 +165,23 @@ class Plugin_Autoupdate_Filter {
 			if ( false === $has_delay_passed ) {
 				$option_key = 'plugin_update_delays';
 				$delays     = get_option( $option_key, array() );
-				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
+				if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
+					$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
 
-				// Get the site's date and time format settings.
-				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-				$formatted_date  = date_i18n( $datetime_format, $delay_date );
+					// Get the site's date and time format settings.
+					$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+					$formatted_date  = date_i18n( $datetime_format, $delay_date );
 
-				// adds message to update notice box for that plugin on the plugins page
-				add_filter(
-					"in_plugin_update_message-{$plugin_file}",
-					function() use ( $plugin_new_version, $formatted_date ) {
-						echo ' Autoupdate to ' . esc_html( $plugin_new_version ) . ' will be delayed until after ' . esc_html( $formatted_date ) . ' UTC.';
-					},
-					10,
-					2
-				);
+					// adds message to update notice box for that plugin on the plugins page
+					add_filter(
+						"in_plugin_update_message-{$plugin_file}",
+						function() use ( $plugin_new_version, $formatted_date ) {
+							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to ' . esc_html( $plugin_new_version ) . ' is currently estimated to run after ' . esc_html( $formatted_date ) . ' UTC.';
+						},
+						10,
+						2
+					);
+				}
 				$update = false;
 			}
 		}
