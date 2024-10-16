@@ -174,7 +174,8 @@ class Plugin_Autoupdate_Filter {
 
 				// Get the site's date and time format settings.
 				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-				$formatted_date  = date_i18n( $datetime_format, $delay_date );
+				// Set the $gmt parameter to true for UTC time
+				$formatted_date = date_i18n( $datetime_format, $delay_date, true );
 
 				// adds message to update notice box for that plugin on the plugins page
 				add_filter(
