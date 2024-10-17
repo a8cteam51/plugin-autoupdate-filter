@@ -5,6 +5,8 @@
  * @package Plugin_Autoupdate_Filter
  */
 
+use AutomateWoo\Error;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
@@ -146,24 +148,50 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_enforce_delay( $update, $item ): bool {
+		// protect against non-bool being returned from this function
+		if ( null === $update ) {
+			$update = false;
+		}
+
 		// no delay if site is a canary site
 		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
 		if ( isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true ) ) {
 			return $update;
 		}
 
-		// otherwise add delay to plugin updates
-		if ( true === $update ) {
-			$helpers = new Plugin_Autoupdate_Filter_Helpers();
+		// otherwise apply delay logic
+		$helpers = new Plugin_Autoupdate_Filter_Helpers();
 
-			$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
-			$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
-			$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
+		$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
+		$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
+		$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
 
-			$has_delay_passed = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
-			if ( false === $has_delay_passed ) {
-				$update = false;
+		$has_delay_passed = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
+
+		if ( false === $has_delay_passed ) {
+			$option_key = 'plugin_update_delays';
+			$delays     = get_option( $option_key, array() );
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) && ( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) ) ) {
+				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
+
+				// Get the site's date and time format settings.
+				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+				// Set the $gmt parameter to true for UTC time
+				$formatted_date = date_i18n( $datetime_format, $delay_date, true );
+
+				// adds message to update notice box for that plugin on the plugins page
+				add_filter(
+					"in_plugin_update_message-{$plugin_file}",
+					function( $plugin_data, $response ) use ( $plugin_new_version, $formatted_date ) {
+						if ( ! empty( $response->package ) ) {
+							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . esc_html( $plugin_new_version ) . ' is currently estimated to run after ' . esc_html( $formatted_date ) . ' UTC.';
+						}
+					},
+					10,
+					2
+				);
 			}
+			$update = false;
 		}
 
 		return $update;
