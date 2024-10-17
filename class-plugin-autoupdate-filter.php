@@ -5,6 +5,8 @@
  * @package Plugin_Autoupdate_Filter
  */
 
+use AutomateWoo\Error;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
@@ -169,7 +171,7 @@ class Plugin_Autoupdate_Filter {
 		if ( false === $has_delay_passed ) {
 			$option_key = 'plugin_update_delays';
 			$delays     = get_option( $option_key, array() );
-			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) && ( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) ) ) {
 				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
 
 				// Get the site's date and time format settings.
@@ -180,8 +182,10 @@ class Plugin_Autoupdate_Filter {
 				// adds message to update notice box for that plugin on the plugins page
 				add_filter(
 					"in_plugin_update_message-{$plugin_file}",
-					function() use ( $plugin_new_version, $formatted_date ) {
-						echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . esc_html( $plugin_new_version ) . ' is currently estimated to run after ' . esc_html( $formatted_date ) . ' UTC.';
+					function( $plugin_data, $response ) use ( $plugin_new_version, $formatted_date ) {
+						if ( ! empty( $response->package ) ) {
+							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . esc_html( $plugin_new_version ) . ' is currently estimated to run after ' . esc_html( $formatted_date ) . ' UTC.';
+						}
 					},
 					10,
 					2
