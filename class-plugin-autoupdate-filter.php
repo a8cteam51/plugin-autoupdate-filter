@@ -169,7 +169,7 @@ class Plugin_Autoupdate_Filter {
 		if ( false === $has_delay_passed ) {
 			$option_key = 'plugin_update_delays';
 			$delays     = get_option( $option_key, array() );
-			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
 				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
 
 				// Get the site's date and time format settings.
