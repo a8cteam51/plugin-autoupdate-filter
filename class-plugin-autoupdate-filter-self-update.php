@@ -72,5 +72,5 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		);
 	}
 }
-$plugin_autoupdate_filter_self_update = new Plugin_Autoupdate_Filter_Self_Update();
-$plugin_autoupdate_filter_self_update->init();
+
+add_action( 'init', array( new Plugin_Autoupdate_Filter_Self_Update(), 'init' ) );

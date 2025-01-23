@@ -390,4 +390,5 @@ class Plugin_Autoupdate_Filter {
 		}
 	}
 }
+
 add_action( 'init', array( new Plugin_Autoupdate_Filter(), 'init' ) );
