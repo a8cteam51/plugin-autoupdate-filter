@@ -390,5 +390,5 @@ class Plugin_Autoupdate_Filter {
 		}
 	}
 }
-$plugin_autoupdate_filter = new Plugin_Autoupdate_Filter();
-$plugin_autoupdate_filter->init();
+
+add_action( 'init', array( new Plugin_Autoupdate_Filter(), 'init' ) );
