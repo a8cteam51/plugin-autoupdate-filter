@@ -1,0 +1,28 @@
+.plugin-autoupdate-filter-logs {
+	margin-top: 2em;
+	padding-top: 1em;
+	border-top: 1px solid #ccd0d4;
+}
+
+.plugin-autoupdate-filter-logs-table-wrap {
+	margin-top: 1em;
+}
+
+.plugin-autoupdate-filter-logs table {
+	border-spacing: 0;
+	width: 100%;
+	clear: both;
+}
+
+.plugin-autoupdate-filter-logs th {
+	font-weight: 600;
+}
+
+.plugin-autoupdate-filter-logs td, 
+.plugin-autoupdate-filter-logs th {
+	padding: 8px 10px;
+}
+
+.plugin-autoupdate-filter-logs tbody tr:nth-child(odd) {
+	background-color: #f9f9f9;
+}

@@ -11,14 +11,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Plugin_Autoupdate_Filter_Helpers {
 
+	/**
+	 * @var array Cache of installed plugins
+	 */
 	private $plugins;
 
-	public function __construct() {
+	/**
+	 * @var Plugin_Autoupdate_Filter_Logger Logger instance
+	 */
+	private $logger;
+
+	/**
+	 * Initialize the helpers
+	 *
+	 * @param Plugin_Autoupdate_Filter_Logger $logger Logger instance
+	 */
+	public function __construct( Plugin_Autoupdate_Filter_Logger $logger ) {
 		if ( ! function_exists( 'get_plugins' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
 		$this->plugins = get_plugins();
+		$this->logger  = $logger;
 	}
 
 	/**
@@ -31,7 +45,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 * @return  bool|null True if the plugin should be updated, false otherwise.
 	 */
 	public function has_delay_passed( string $plugin_slug, string $plugin_new_version, string $plugin_file ): ?bool {
-		// delay most plugins 2 days. delay some plugins 7 days.
 		$longer_delay_plugins = array(
 			'woocommerce/woocommerce.php',
 			'woocommerce-payments/woocommerce-payments.php',
@@ -40,28 +53,57 @@ class Plugin_Autoupdate_Filter_Helpers {
 		$delay_days        = in_array( $plugin_file, $longer_delay_plugins, true ) ? 7 : 2;
 		$installed_version = $this->get_installed_plugin_version( $plugin_file );
 
+		$update_info = array(
+			'Status'          => 'Checking version delay requirements',
+			'Version Info'    => array(
+				'Current Version' => $installed_version,
+				'New Version'     => $plugin_new_version,
+			),
+			'Update Controls' => array(
+				'Required Delay Days'   => $delay_days,
+				'Extended Delay Plugin' => in_array( $plugin_file, $longer_delay_plugins, true ),
+			),
+		);
+
 		if ( $plugin_new_version === $installed_version ) {
+			$update_info['Status'] = 'Versions match - no update needed';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return null;
 		}
 
 		if ( '0.0.0' === $installed_version || '0.0.0' === $plugin_new_version ) {
+			$update_info['Status'] = 'Invalid version detected';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
 		$installed_version_parts = explode( '.', $installed_version );
 		$update_version_parts    = explode( '.', $plugin_new_version );
 
-		// only apply delays to major and minor releases. let point releases (patches) go through.
-		if ( $installed_version_parts[0] !== $update_version_parts[0] || $installed_version_parts[1] !== $update_version_parts[1] ) {
-			$update_allowed_after = $this->get_delay_date( $plugin_slug, $plugin_new_version, $delay_days, $plugin_file );
+		$update_info['Version Info']['Version Parts'] = array(
+			'Current' => $installed_version_parts,
+			'New'     => $update_version_parts,
+		);
+
+		if ( $installed_version_parts[0] !== $update_version_parts[0] ||
+			$installed_version_parts[1] !== $update_version_parts[1] ) {
+
+			$update_allowed_after                                   = $this->get_delay_date( $plugin_slug, $plugin_new_version, $delay_days, $plugin_file );
+			$update_info['Update Controls']['Update Allowed After'] = gmdate( 'Y-m-d\TH:i:s\Z', $update_allowed_after );
 
 			if ( time() >= $update_allowed_after ) {
+				$update_info['Status'] = 'Update allowed - delay period passed';
+				$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 				return true;
 			}
 
+			$update_info['Status'] = 'Update blocked - still within delay period';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
+		$update_info['Status'] = 'Update allowed - point release';
+		$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 		return true;
 	}
 
@@ -70,7 +112,7 @@ class Plugin_Autoupdate_Filter_Helpers {
 	 *
 	 * @param   string $plugin_file The relative path to the plugin file.
 	 *
-	 * @return  string Current version of the plugin or an empty string if not found.
+	 * @return  string Current version of the plugin or '0.0.0' if not found.
 	 */
 	public function get_installed_plugin_version( string $plugin_file ): string {
 		return $this->plugins[ $plugin_file ]['Version'] ?? '0.0.0';
@@ -96,8 +138,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 				$release_date = time();
 			}
 
-			// We've got a release date. That release date could be 10 days ago. So instead of adding extra days,
-			// make a calculation here to see if time() > $release_date + $delay_days. If so, the update version time is now.
 			$release_plus_delay = strtotime( "+$delay_days days", $release_date );
 			if ( time() > $release_plus_delay ) {
 				$release_plus_delay = time();
@@ -124,7 +164,8 @@ class Plugin_Autoupdate_Filter_Helpers {
 
 		$plugin_info = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( isset( $plugin_info['last_updated'] ) ) {
-			return strtotime( $plugin_info['last_updated'] ) ?: time();
+			$timestamp = strtotime( $plugin_info['last_updated'] );
+			return false === $timestamp ? time() : $timestamp;
 		}
 
 		return time();

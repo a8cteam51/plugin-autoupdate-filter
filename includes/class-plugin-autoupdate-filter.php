@@ -5,13 +5,11 @@
  * @package Plugin_Autoupdate_Filter
  */
 
-use AutomateWoo\Error;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
-require_once 'includes/class-plugin-autoupdate-filter-helpers.php';
+require_once 'class-plugin-autoupdate-filter-helpers.php';
 
 class Plugin_Autoupdate_Filter {
 
@@ -21,19 +19,37 @@ class Plugin_Autoupdate_Filter {
 	private $settings;
 
 	/**
+	 * @var Plugin_Autoupdate_Filter_Logger Logger instance
+	 */
+	private $logger;
+
+	/**
+	 * Initialize the plugin
+	 *
+	 * @param Plugin_Autoupdate_Filter_Logger $logger Logger instance
+	 */
+	public function __construct( Plugin_Autoupdate_Filter_Logger $logger ) {
+		$this->logger = $logger;
+	}
+
+	/**
 	 * Initialize WordPress hooks
 	 */
 	public function init(): void {
-
 		// get the centralized settings from opsoasis
 		try {
 			$this->settings = $this->get_auto_update_settings();
 		} catch ( Exception $exception ) {
-
 			$error_message  = $exception->getMessage();
 			$this->settings = (object) array( 'disable_all' => true );
-
-			error_log( "Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings ({$error_message})" ); // phpcs:disable WordPress.PHP.DevelopmentFunctions
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error -- Logging API errors is acceptable in production
+			trigger_error(
+				sprintf(
+					'Plugin Autoupdate Filter: Unable to retrieve the autoupdate settings (%s)',
+					esc_html( $error_message )
+				),
+				E_USER_WARNING
+			);
 			add_action(
 				'admin_notices',
 				function() use ( $error_message ) {
@@ -71,16 +87,12 @@ class Plugin_Autoupdate_Filter {
 		add_filter( 'auto_update_core', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_filter( 'auto_update_theme', array( $this, 'filter_maybe_disable_all_autoupdates' ), PHP_INT_MAX, 2 );
 		add_action( 'admin_init', array( $this, 'output_auto_updates_disabled_admin_notice' ) );
-
-		// Clean-up delay data after a plugin is updated
-		add_action( 'upgrader_process_complete', array( $this, 'cleanup_plugin_delay_after_update_complete' ), 10, 2 );
 	}
 
 	/**
 	 * Load settings from the centralized settings page
 	 */
 	private function get_auto_update_settings(): stdClass {
-
 		// Try getting the settings from the transient first
 		$transient_key = 'wpcpmsp_auto_update_settings';
 		$settings      = get_transient( $transient_key );
@@ -99,7 +111,7 @@ class Plugin_Autoupdate_Filter {
 			$response_body = wp_remote_retrieve_body( $response );
 
 			// Check that the response code is a 2xx code.
-			if ( ! \str_starts_with( (string) $response_code, '2' ) ) {
+			if ( ! str_starts_with( (string) $response_code, '2' ) ) {
 				$response_message = wp_remote_retrieve_response_message( $response );
 				throw new Exception( $response_message, $response_code );
 			}
@@ -125,76 +137,26 @@ class Plugin_Autoupdate_Filter {
 	/**
 	 * If we have hit the "Disable all autoupdates" toggle switch, or if we can't get the centralized settings, don't autoupdate anything.
 	 *
-	 * @param bool|null   $update Whether to update the plugin or not. This can be bool or null as per the docs
-	 * @param object $item   The plugin update object.
+	 * @param bool|null $update Whether to update the plugin or not. This can be bool or null as per the docs
+	 * @param object    $item   The plugin update object.
 	 *
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
+		$update_info = array(
+			'Status'          => 'Checking global updates status',
+			'Update Controls' => array(
+				'Global Updates Enabled' => ! isset( $this->settings->disable_all ),
+			),
+		);
 
 		if ( isset( $this->settings->disable_all ) || null === $update ) {
+			$update_info['Status'] = 'Updates globally disabled';
+			$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
 
-		return $update;
-	}
-
-	/**
-	 * Disable plugin auto-updates based on if a delay has passed since plugin was released.
-	 *
-	 * @param bool   $update Whether to update the plugin or not.
-	 * @param object $item   The plugin update object.
-	 *
-	 * @return bool True to update, false to not update.
-	 */
-	public function filter_enforce_delay( $update, $item ): bool {
-		// protect against non-bool being returned from this function
-		if ( null === $update ) {
-			$update = false;
-		}
-
-		// no delay if site is a canary site
-		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
-		if ( isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true ) ) {
-			return $update;
-		}
-
-		// otherwise apply delay logic
-		$helpers = new Plugin_Autoupdate_Filter_Helpers();
-
-		$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
-		$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
-		$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
-
-		$has_delay_passed = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
-
-		if ( false === $has_delay_passed ) {
-			$option_key = 'plugin_update_delays';
-			$delays     = get_option( $option_key, array() );
-			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) && ( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) ) ) {
-				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
-
-				// Get the site's date and time format settings.
-				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-				// Set the $gmt parameter to true for UTC time
-				$formatted_date = date_i18n( $datetime_format, $delay_date, true );
-
-				// adds message to update notice box for that plugin on the plugins page
-				add_filter(
-					"in_plugin_update_message-{$plugin_file}",
-					function( $plugin_data, $response ) use ( $plugin_new_version, $formatted_date ) {
-						if ( ! empty( $response->package ) ) {
-							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . esc_html( $plugin_new_version ) . ' is currently estimated to run after ' . esc_html( $formatted_date ) . ' UTC.';
-						}
-					},
-					10,
-					2
-				);
-			}
-			$update = false;
-		}
-
-		return $update;
+		return (bool) $update;
 	}
 
 	/**
@@ -218,15 +180,9 @@ class Plugin_Autoupdate_Filter {
 		);
 		$holidays = apply_filters( 'plugin_autoupdate_filter_holidays', $holidays );
 
-		$now = gmdate( 'Y-m-d H:i:s' );
-
-		foreach ( $holidays as $holiday ) {
-			$start = $holiday['start'];
-			$end   = $holiday['end'];
-			if ( $start <= $now && $now <= $end ) {
-				return false;
-			}
-		}
+		$now  = gmdate( 'Y-m-d H:i:s' );
+		$hour = gmdate( 'H' );
+		$day  = gmdate( 'D' );
 
 		$hours = array(
 			'start'      => '10', // 6am Eastern
@@ -235,66 +191,123 @@ class Plugin_Autoupdate_Filter {
 		);
 		$hours = apply_filters( 'plugin_autoupdate_filter_hours', $hours );
 
-		$days_off = array(
-			'Sat',
-			'Sun',
-		);
+		$days_off = array( 'Sat', 'Sun' );
 		$days_off = apply_filters( 'plugin_autoupdate_filter_days_off', $days_off );
 
-		$hour = gmdate( 'H' ); // Current hour
-		$day  = gmdate( 'D' );  // Current day of the week
+		$update_info = array(
+			'Status'          => 'Checking business hours',
+			'Update Controls' => array(
+				'Current Time'          => $now,
+				'Within Business Hours' => array(
+					'Hour Check'  => $hour >= $hours['start'] && $hour <= $hours['end'],
+					'Day Check'   => ! in_array( $day, $days_off, true ),
+					'Friday Rule' => 'Fri' !== $day || $hour <= $hours['friday_end'],
+				),
+				'Holiday Status'        => array(),
+			),
+		);
 
-		// If outside business hours, disable auto-updates
-		if ( $hour < $hours['start'] || $hour > $hours['end'] || in_array( $day, $days_off, true ) || ( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
+		// Check holidays
+		foreach ( $holidays as $holiday_name => $holiday ) {
+			$update_info['Update Controls']['Holiday Status'][ $holiday_name ] = array(
+				'Period' => $holiday['start'] . ' to ' . $holiday['end'],
+				'Active' => $holiday['start'] <= $now && $now <= $holiday['end'],
+			);
+
+			if ( $holiday['start'] <= $now && $now <= $holiday['end'] ) {
+				$update_info['Status'] = 'Update blocked - holiday period';
+				$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
+				return false;
+			}
+		}
+
+		if ( $hour < $hours['start'] || $hour > $hours['end'] ||
+				in_array( $day, $days_off, true ) ||
+				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
+			$update_info['Status'] = 'Update blocked - outside business hours';
+			$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
 
-		// Otherwise, plugins will autoupdate regardless of settings in wp-admin
+		$update_info['Status'] = 'Update allowed - within business hours';
+		$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 		return true;
 	}
 
 	/**
-	 * Customize auto-update email recipients.
+	 * Disable plugin auto-updates based on if a delay has passed since plugin was released.
 	 *
-	 * @param array  $email              Array of email data.
-	 * @param string $type               Type of email to send.
-	 * @param array  $successful_updates Array of successful updates.
-	 * @param array  $failed_updates     Array of failed updates.
+	 * @param bool   $update Whether to update the plugin or not.
+	 * @param object $item   The plugin update object.
 	 *
-	 * @return array Array of email data with modified recipient email.
+	 * @return bool True to update, false to not update.
 	 */
-	public function filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ): array {
-		$email['to'] = 'concierge@wordpress.com';
-		return $email;
-	}
+	public function filter_enforce_delay( $update, $item ): bool {
+		// protect against non-bool being returned from this function
+		if ( null === $update ) {
+			$update = false;
+		}
 
-	/**
-	 * Filters the recipient email address for plugin update failure notifications.
-	 * @param array $email The email details, including 'to', 'subject', 'body', 'headers'.
-	 * @param int $failures The number of failures encountered while upgrading.
-	 * @param mixed $update_results The results of all attempted updates.
-	 *
-	 * @return array $email The email details with the 'to' address modified.
-	 */
-	public function filter_custom_debug_email( $email, $failures, $update_results ): array {
-		$email['to'] = 'concierge@wordpress.com';
-		return $email;
+		$helpers = new Plugin_Autoupdate_Filter_Helpers( $this->logger );
+
+		$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
+		$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
+		$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
+
+		// Get current version
+		$current_version = $helpers->get_installed_plugin_version( $plugin_file );
+
+		$update_info = array(
+			'Status'       => 'Checking update delay requirements',
+			'Version Info' => array(
+				'Current Version' => $current_version,
+				'New Version'     => $plugin_new_version,
+			),
+		);
+
+		// no delay if site is a canary site
+		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
+		$update_info['Update Controls']['Is Canary Site'] = isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true );
+
+		if ( $update_info['Update Controls']['Is Canary Site'] ) {
+			$update_info['Status'] = 'Update allowed - canary site';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
+			return $update;
+		}
+
+		$has_delay_passed                                      = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
+		$update_info['Update Controls']['Delay Period Passed'] = $has_delay_passed;
+
+		if ( false === $has_delay_passed ) {
+			$option_key = 'plugin_update_delays';
+			$delays     = get_option( $option_key, array() );
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
+				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
+				$update_info['Update Controls']['Scheduled Update Time'] = gmdate( 'Y-m-d\TH:i:s\Z', $delay_date );
+			}
+
+			$update_info['Status'] = 'Update blocked - delay period not passed';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
+			return false;
+		}
+
+		$update_info['Status'] = 'Update allowed - delay requirements met';
+		$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
+		return $update;
 	}
 
 	/**
 	 * Customize automatic update setting HTML for plugins page in wp-admin.
 	 *
-	 * @param string $html       HTML for automatic update settings.
+	 * @param string $html        HTML for automatic update settings.
 	 * @param string $plugin_file Path to plugin file.
 	 * @param array  $plugin_data Array of plugin data.
 	 *
 	 * @return string Customized HTML for automatic update settings.
 	 */
 	public function filter_custom_setting_html( $html, $plugin_file, $plugin_data ): string {
-
 		// check if updates are explicitly blocked for this plugin
 		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
-
 			// create a fake object to feed to disable_autoupdate_specific_plugins
 			$plugin_obj                    = new stdClass();
 			$plugin_obj->slug              = dirname( $plugin_file );
@@ -310,10 +323,8 @@ class Plugin_Autoupdate_Filter {
 
 	/**
 	 * Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
-	 *
 	 */
 	public function output_upgrade_message_for_specific_plugins(): void {
-
 		// check if updates are explicitly blocked for this plugin
 		// don't show if we are already disabling all updates
 		if ( ! function_exists( 'disable_autoupdate_specific_plugins' ) || isset( $this->settings->disable_all ) ) {
@@ -347,7 +358,6 @@ class Plugin_Autoupdate_Filter {
 							echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> Autoupdates have been explicitly deactivated for ', esc_html( $slug ), '. Please contact the WordPress Special Projects team before manually updating.</p></div>';
 						}
 					);
-
 				}
 			}
 		}
@@ -355,7 +365,6 @@ class Plugin_Autoupdate_Filter {
 
 	/**
 	 * Autoupdates disabled admin notice
-	 *
 	 */
 	public function output_auto_updates_disabled_admin_notice(): void {
 		// add notice to the top of the screen
@@ -367,28 +376,37 @@ class Plugin_Autoupdate_Filter {
 					echo '<div class="notice notice-error"><p><strong style="color:red;"> Caution:</strong> All automatic updates are deactivated. Please contact the WordPress Special Projects team before manually updating plugins.</p></div>';
 				}
 			);
-
 		}
 	}
 
 	/**
-	 * Executes after a plugin has been updated.
-	 * Cleanup plugin delay data after update is complete.
+	 * Customize auto-update email recipients.
 	 *
-	 * @param object $upgrader_object WP_Upgrader instance.
-	 * @param array  $options         Array of bulk item update data.
+	 * @param array  $email              Array of email data.
+	 * @param string $type               Type of email to send.
+	 * @param array  $successful_updates Array of successful updates.
+	 * @param array  $failed_updates     Array of failed updates.
+	 *
+	 * @return array Array of email data with modified recipient email.
 	 */
-	public function cleanup_plugin_delay_after_update_complete( $upgrader_object, $options ) {
-		// Check if this is a plugin update.
-		if ( 'update' === $options['action'] && 'plugin' === $options['type'] ) {
-			if ( isset( $options['plugins'] ) ) {
-				$helpers = new Plugin_Autoupdate_Filter_Helpers();
-				foreach ( $options['plugins'] as $plugin ) {
-					$helpers->clear_plugin_delay( $plugin );
-				}
-			}
-		}
+	public function filter_custom_update_emails( $email, $type, $successful_updates, $failed_updates ): array {
+		$email['to'] = 'concierge@wordpress.com';
+		return $email;
+	}
+
+	/**
+	 * Filters the recipient email address for plugin update failure notifications.
+	 *
+	 * @param array $email          The email details, including 'to', 'subject', 'body', 'headers'.
+	 * @param int   $failures       The number of failures encountered while upgrading.
+	 * @param mixed $update_results The results of all attempted updates.
+	 *
+	 * @return array $email The email details with the 'to' address modified.
+	 */
+	public function filter_custom_debug_email( $email, $failures, $update_results ): array {
+		$email['to'] = 'concierge@wordpress.com';
+		return $email;
 	}
 }
 
-add_action( 'init', array( new Plugin_Autoupdate_Filter(), 'init' ) );
+add_action( 'init', array( new Plugin_Autoupdate_Filter( new Plugin_Autoupdate_Filter_Logger() ), 'init' ) );
