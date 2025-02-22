@@ -2,7 +2,33 @@
 |--------------------------------------------|
 
 # Plugin Autoupdate Filter
-Filters whether autoupdates are on based on day/time and other settings.
+
+Controls and filters WordPress plugin auto-updates based on configurable rules.
+
+## Features
+
+- Restricts plugin auto-updates to business hours
+- Enforces delays on updates after release
+- Supports canary sites for early updates
+- Integrates with OpsOasis for centralized control
+- Detailed logging of update decisions
+
+## Logging
+
+The plugin can log some more detailed information about autoupdate attempts.
+
+Logs are stored in `wp-content/uploads/plugin-autoupdate-filter-logs/` with daily rotation. Log retention period is configurable in settings (default 15 days).
+
+## Settings
+
+Navigate to **Settings > Plugin Autoupdate Filter**
+
+- **Enable Logging**: Turn detailed logging on/off
+- **Log Retention**: Number of days to keep logs (1-60 days)
+
+## Integration
+
+Integrates with OpsOasis for centralized control of auto-updates across multiple sites. When OpsOasis disables updates, this is logged and updates are blocked.
 
 ## What's this?
 This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:

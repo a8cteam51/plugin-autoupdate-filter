@@ -53,23 +53,24 @@ class Plugin_Autoupdate_Filter_Helpers {
 		$delay_days        = in_array( $plugin_file, $longer_delay_plugins, true ) ? 7 : 2;
 		$installed_version = $this->get_installed_plugin_version( $plugin_file );
 
+		if ( $plugin_new_version === $installed_version ) {
+			return null;
+		}
+
 		$update_info = array(
 			'Status'          => 'Checking version delay requirements',
 			'Version Info'    => array(
-				'Current Version' => $installed_version,
-				'New Version'     => $plugin_new_version,
+				'Current Version'   => $installed_version,
+				'New Version'       => $plugin_new_version,
+				'Plugin File'       => $plugin_file,
+				'Is Extended Delay' => in_array( $plugin_file, $longer_delay_plugins, true ),
+				'Delay Days'        => $delay_days,
 			),
 			'Update Controls' => array(
 				'Required Delay Days'   => $delay_days,
 				'Extended Delay Plugin' => in_array( $plugin_file, $longer_delay_plugins, true ),
 			),
 		);
-
-		if ( $plugin_new_version === $installed_version ) {
-			$update_info['Status'] = 'Versions match - no update needed';
-			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
-			return null;
-		}
 
 		if ( '0.0.0' === $installed_version || '0.0.0' === $plugin_new_version ) {
 			$update_info['Status'] = 'Invalid version detected';
@@ -85,11 +86,13 @@ class Plugin_Autoupdate_Filter_Helpers {
 			'New'     => $update_version_parts,
 		);
 
-		if ( $installed_version_parts[0] !== $update_version_parts[0] ||
-			$installed_version_parts[1] !== $update_version_parts[1] ) {
+		$is_major_change = $installed_version_parts[0] !== $update_version_parts[0] ||
+			$installed_version_parts[1] !== $update_version_parts[1];
 
+		if ( $is_major_change ) {
 			$update_allowed_after                                   = $this->get_delay_date( $plugin_slug, $plugin_new_version, $delay_days, $plugin_file );
 			$update_info['Update Controls']['Update Allowed After'] = gmdate( 'Y-m-d\TH:i:s\Z', $update_allowed_after );
+			$update_info['Update Controls']['Current Time']         = gmdate( 'Y-m-d\TH:i:s\Z', time() );
 
 			if ( time() >= $update_allowed_after ) {
 				$update_info['Status'] = 'Update allowed - delay period passed';
@@ -139,9 +142,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 			}
 
 			$release_plus_delay = strtotime( "+$delay_days days", $release_date );
-			if ( time() > $release_plus_delay ) {
-				$release_plus_delay = time();
-			}
 
 			$delays[ $plugin_file ][ $update_version ] = $release_plus_delay;
 			update_option( $option_key, $delays );

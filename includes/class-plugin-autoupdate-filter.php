@@ -195,17 +195,22 @@ class Plugin_Autoupdate_Filter {
 		$days_off = apply_filters( 'plugin_autoupdate_filter_days_off', $days_off );
 
 		$update_info = array(
-			'Status'          => 'Checking business hours',
-			'Update Controls' => array(
+			'Status' => 'Checking business hours',
+		);
+
+		// Only add controls if update is blocked
+		if ( $hour < $hours['start'] || $hour > $hours['end'] ||
+				in_array( $day, $days_off, true ) ||
+				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
+			$update_info['Update Controls'] = array(
 				'Current Time'          => $now,
 				'Within Business Hours' => array(
 					'Hour Check'  => $hour >= $hours['start'] && $hour <= $hours['end'],
 					'Day Check'   => ! in_array( $day, $days_off, true ),
 					'Friday Rule' => 'Fri' !== $day || $hour <= $hours['friday_end'],
 				),
-				'Holiday Status'        => array(),
-			),
-		);
+			);
+		}
 
 		// Check holidays
 		foreach ( $holidays as $holiday_name => $holiday ) {
@@ -235,6 +240,13 @@ class Plugin_Autoupdate_Filter {
 	}
 
 	/**
+	 * Check if updates are disabled globally
+	 */
+	private function are_updates_disabled(): bool {
+		return isset( $this->settings->disable_all ) && '1' === $this->settings->disable_all;
+	}
+
+	/**
 	 * Disable plugin auto-updates based on if a delay has passed since plugin was released.
 	 *
 	 * @param bool   $update Whether to update the plugin or not.
@@ -257,41 +269,46 @@ class Plugin_Autoupdate_Filter {
 		// Get current version
 		$current_version = $helpers->get_installed_plugin_version( $plugin_file );
 
+		// Initialize update info
 		$update_info = array(
-			'Status'       => 'Checking update delay requirements',
-			'Version Info' => array(
+			'Status'          => 'Checking update requirements',
+			'Version Info'    => array(
 				'Current Version' => $current_version,
 				'New Version'     => $plugin_new_version,
 			),
+			'Update Controls' => array(
+				'Is Canary Site'               => false,
+				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
+			),
 		);
 
-		// no delay if site is a canary site
-		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
-		$update_info['Update Controls']['Is Canary Site'] = isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true );
-
-		if ( $update_info['Update Controls']['Is Canary Site'] ) {
-			$update_info['Status'] = 'Update allowed - canary site';
-			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
-			return $update;
-		}
-
-		$has_delay_passed                                      = $helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
-		$update_info['Update Controls']['Delay Period Passed'] = $has_delay_passed;
-
-		if ( false === $has_delay_passed ) {
-			$option_key = 'plugin_update_delays';
-			$delays     = get_option( $option_key, array() );
-			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) ) {
-				$delay_date = $delays[ $plugin_file ][ $plugin_new_version ];
-				$update_info['Update Controls']['Scheduled Update Time'] = gmdate( 'Y-m-d\TH:i:s\Z', $delay_date );
-			}
-
-			$update_info['Status'] = 'Update blocked - delay period not passed';
+		// Check if updates are disabled globally
+		if ( $this->are_updates_disabled() ) {
+			$update_info['Status'] = 'Update blocked - disabled by OpsOasis';
 			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
-		$update_info['Status'] = 'Update allowed - delay requirements met';
+		// Check for WooCommerce.com plugins and their update availability
+		$is_woo_plugin = strpos( $plugin_file, 'woocommerce-' ) === 0 ||
+		strpos( $plugin_file, 'woocommerce.com' ) !== false;
+
+		$can_auto_update = empty( $plugin_file ) ||
+		strpos( $plugin_file, 'wordpress.org' ) !== false ||
+		( $is_woo_plugin && ! empty( $item->package ) );
+
+		// Then add the WooCommerce check
+		if ( $is_woo_plugin && empty( $item->package ) ) {
+			$update_info['Update Controls']['Is WooCommerce Extension'] = true;
+			$update_info['Update Controls']['Has Update Package']       = false;
+		}
+
+		// Check for canary site status
+		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
+		$update_info['Update Controls']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
+			in_array( $site_url, $this->settings->canary_sites, true );
+
+		$update_info['Status'] = 'Auto-update scheduled';
 		$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 		return $update;
 	}
@@ -367,9 +384,12 @@ class Plugin_Autoupdate_Filter {
 	 * Autoupdates disabled admin notice
 	 */
 	public function output_auto_updates_disabled_admin_notice(): void {
+		static $notice_added = false;
+
 		// add notice to the top of the screen
 		global $pagenow;
-		if ( 'plugins.php' === $pagenow && isset( $this->settings->disable_all ) ) {
+		if ( 'plugins.php' === $pagenow && isset( $this->settings->disable_all ) && ! $notice_added ) {
+			$notice_added = true;
 			add_action(
 				'admin_notices',
 				function() {

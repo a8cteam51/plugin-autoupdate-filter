@@ -23,6 +23,26 @@ class Plugin_Autoupdate_Filter_Logger {
 	private $wp_filesystem;
 
 	/**
+	 * @var array Cache of logged entries to prevent duplicates
+	 */
+	private $logged_entries = array();
+
+	/**
+	 * @var array Track the final status for each plugin update attempt
+	 */
+	private $plugin_statuses = array();
+
+	/**
+	 * @var array Track update checks for each plugin
+	 */
+	private $update_checks = array();
+
+	/**
+	 * @var array Track which plugins we've already logged
+	 */
+	private $logged_plugins = array();
+
+	/**
 	 * Initialize the logger
 	 */
 	public function __construct() {
@@ -84,7 +104,7 @@ class Plugin_Autoupdate_Filter_Logger {
 
 		// Create the directory if it doesn't exist
 		if ( ! $this->wp_filesystem->is_dir( $this->log_directory ) ) {
-			if ( ! $this->wp_filesystem->mkdir( $this->log_directory ) ) {
+			if ( ! wp_mkdir_p( $this->log_directory ) ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error -- Logging filesystem errors is acceptable in production
 				trigger_error(
 					esc_html( 'Plugin Autoupdate Filter: Unable to create log directory' ),
@@ -97,11 +117,19 @@ class Plugin_Autoupdate_Filter_Logger {
 			$index_content = "<?php\n// Silence is golden.";
 			$this->wp_filesystem->put_contents(
 				trailingslashit( $this->log_directory ) . 'index.php',
-				$index_content
+				$index_content,
+				FS_CHMOD_FILE
 			);
 		}
 
 		return true;
+	}
+
+	/**
+	 * Get the transient key for a plugin
+	 */
+	private function get_transient_key( string $plugin_key ): string {
+		return 'paf_logged_' . md5( $plugin_key );
 	}
 
 	/**
@@ -117,22 +145,142 @@ class Plugin_Autoupdate_Filter_Logger {
 			return false;
 		}
 
-		if ( ! $this->ensure_log_directory() ) {
-			return false;
+		// Get the current version
+		$current_version = $update_info['Version Info']['Current Version'] ?? 'unknown';
+
+		// Skip if versions are the same
+		if ( 'unknown' !== $current_version && $current_version === $new_version ) {
+			return true;
 		}
 
-		$timestamp = gmdate( 'Y-m-d\TH:i:s\Z' );
-		$log_date  = gmdate( 'Y-m-d' );
-		$log_file  = $this->log_directory . "/{$log_date}-plugin-autoupdate-filter.log";
+		// Get today's log file
+		$log_date = gmdate( 'Y-m-d' );
+		$log_file = $this->log_directory . "/{$log_date}-plugin-autoupdate-filter.log";
 
-		$log_entry  = "[{$timestamp}] Plugin Update Attempt: {$plugin_name} {$new_version}\n";
-		$log_entry .= wp_json_encode( $update_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n\n";
+		// Check if we've already logged this plugin update attempt today
+		if ( $this->wp_filesystem->exists( $log_file ) ) {
+			$existing_content = $this->wp_filesystem->get_contents( $log_file );
+			$timestamp        = gmdate( 'Y-m-d\TH:i:s\Z' );
+			$search_string    = "[{$timestamp}] Plugin Update Attempt: {$plugin_name} {$new_version}";
+			if ( false !== strpos( $existing_content, $search_string ) ) {
+				return true;
+			}
+		}
 
-		return (bool) $this->wp_filesystem->put_contents(
-			$log_file,
-			$log_entry,
-			FILE_APPEND
+		// Initialize or update the checks for this plugin
+		if ( ! isset( $this->update_checks[ $plugin_name . '|' . $new_version ] ) ) {
+			$this->update_checks[ $plugin_name . '|' . $new_version ] = array(
+				'timestamp'    => gmdate( 'Y-m-d\TH:i:s\Z' ),
+				'plugin_name'  => $plugin_name,
+				'version_info' => array(
+					'Current Version' => $current_version,
+					'New Version'     => $new_version,
+				),
+				'details'      => array(
+					'Has Update Package'           => true,
+					'Outside business hours'       => false,
+					'Holiday period'               => false,
+					'Delay passed'                 => true,
+					'Updates disabled by OpsOasis' => false,
+				),
+			);
+		} elseif ( 'unknown' !== $current_version ) {
+			// Update current version if we now have it
+			$this->update_checks[ $plugin_name . '|' . $new_version ]['version_info']['Current Version'] = $current_version;
+		}
+
+		// Update the checks based on the status
+		$checks = &$this->update_checks[ $plugin_name . '|' . $new_version ];
+
+		// Check for OpsOasis block first
+		if ( isset( $update_info['Update Controls']['Updates disabled by OpsOasis'] ) &&
+		true === $update_info['Update Controls']['Updates disabled by OpsOasis'] ) {
+			$checks['details']['Updates disabled by OpsOasis'] = true;
+		} elseif ( false !== strpos( $update_info['Status'], 'disabled by OpsOasis' ) ) {
+			$checks['details']['Updates disabled by OpsOasis'] = true;
+		}
+
+		if ( false !== strpos( $update_info['Status'], 'outside business hours' ) ) {
+			$checks['details']['Outside business hours'] = true;
+		}
+
+		if ( isset( $update_info['Update Controls']['Has Update Package'] ) ) {
+			$checks['details']['Has Update Package'] = (bool) $update_info['Update Controls']['Has Update Package'];
+		}
+
+		if ( false !== strpos( $update_info['Status'], 'delayed' ) ) {
+			$checks['details']['Delay passed'] = false;
+		}
+
+		// If this is a final status, write the log
+		if ( $this->is_final_status( $update_info['Status'] ) ) {
+			$log_info = array(
+				'Status'       => $this->determine_final_status( $checks['details'] ),
+				'Version Info' => $checks['version_info'],
+				'Details'      => $checks['details'],
+			);
+
+			// Format the log entry
+			$timestamp  = $checks['timestamp'];
+			$log_entry  = "[{$timestamp}] Plugin Update Attempt: {$plugin_name} {$new_version}\n";
+			$log_entry .= wp_json_encode( $log_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n\n";
+
+			// Write to file
+			if ( ! $this->ensure_log_directory() ) {
+				return false;
+			}
+
+			// Append to log file
+			$existing_content = '';
+			if ( $this->wp_filesystem->exists( $log_file ) ) {
+				$existing_content = $this->wp_filesystem->get_contents( $log_file );
+			}
+			$full_content = $existing_content . $log_entry;
+			$result       = $this->wp_filesystem->put_contents( $log_file, $full_content, FS_CHMOD_FILE );
+
+			// Mark this plugin as logged using a transient that expires in 1 minute
+			if ( $result ) {
+				set_transient( $this->get_transient_key( $plugin_name . '|' . $new_version ), true, MINUTE_IN_SECONDS );
+				unset( $this->update_checks[ $plugin_name . '|' . $new_version ] );
+			}
+
+			return (bool) $result;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check if this is a final status that should trigger log writing
+	 */
+	private function is_final_status( string $status ): bool {
+		$final_statuses = array(
+			'Auto-update skipped - WooCommerce.com connection required',
+			'Auto-update scheduled',
+			'Update complete',
+			'Update blocked - disabled by OpsOasis',
 		);
+
+		foreach ( $final_statuses as $final_status ) {
+			if ( strpos( $status, $final_status ) === 0 ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Determine the final status based on all checks
+	 */
+	private function determine_final_status( array $details ): string {
+		if ( $details['Updates disabled by OpsOasis'] ||
+		! $details['Has Update Package'] ||
+		$details['Outside business hours'] ||
+		! $details['Delay passed'] ) {
+			return 'Autoupdate blocked';
+		}
+		return 'Autoupdate allowed';
 	}
 
 	/**

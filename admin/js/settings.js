@@ -2,31 +2,44 @@
 	'use strict';
 
 	$( document ).ready( function() {
-		const $logsTable = $( '.plugin-autoupdate-filter-logs-table-wrap' );
-		const $toggleButton = $( '<button>', {
-			text: 'Show Log Files',
-			class: 'button button-secondary',
-			css: { 'margin-left': '10px' }
+		const $logContent = $( '#log-content' );
+		const $logSelect = $( '#log-file-select' );
+
+		// Handle log file selection
+		$logSelect.on( 'change', function() {
+			const date = $(this).val();
+			if ( ! date ) {
+				$logContent.slideUp();
+				return;
+			}
+
+			$.ajax({
+				url: pluginAutoupdateFilter.ajaxUrl,
+				data: {
+					action: 'get_log_content',
+					date: date,
+					nonce: pluginAutoupdateFilter.nonce
+				},
+				success: function( response ) {
+					if ( response.success ) {
+						$logContent.find('pre').text( response.data );
+						$logContent.slideDown();
+					} else {
+						// Show the actual error message
+						alert( 'Error loading log file: ' + response.data );
+					}
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					alert( 'AJAX error: ' + textStatus + ' - ' + errorThrown );
+				}
+			});
 		});
 
-		// Initially hide the table
-		$logsTable.hide();
-
-		// Add the toggle button after the h2
-		$( '.plugin-autoupdate-filter-logs h2' ).append( $toggleButton );
-
-		// Toggle table visibility when button is clicked
-		$toggleButton.on( 'click', function( e ) {
-			e.preventDefault();
-			$logsTable.slideToggle( 'fast' );
-			$toggleButton.text( $logsTable.is( ':visible' ) ? 'Hide Log Files' : 'Show Log Files' );
-		});
-
-		// Update table visibility when logging is enabled/disabled
+		// Update visibility when logging is disabled
 		$( 'input[name="plugin_autoupdate_filter_enable_logging"]' ).on( 'change', function() {
 			if ( ! this.checked ) {
-				$logsTable.slideUp( 'fast' );
-				$toggleButton.text( 'Show Log Files' );
+				$logContent.slideUp();
+				$logSelect.val('');
 			}
 		});
 	});

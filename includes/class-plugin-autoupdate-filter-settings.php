@@ -33,6 +33,7 @@ class Plugin_Autoupdate_Filter_Settings {
 		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'wp_ajax_get_log_content', array( $this, 'get_log_content' ) );
 	}
 
 	/**
@@ -123,6 +124,52 @@ class Plugin_Autoupdate_Filter_Settings {
 			PLUGIN_AUTOUPDATE_FILTER_VERSION,
 			true
 		);
+
+		wp_localize_script(
+			'plugin-autoupdate-filter-admin',
+			'pluginAutoupdateFilter',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'get_log_content' ),
+			)
+		);
+	}
+
+	/**
+	 * Ajax handler to get log content
+	 */
+	public function get_log_content(): void {
+		check_ajax_referer( 'get_log_content', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$date = sanitize_text_field( $_GET['date'] ?? '' );
+		if ( empty( $date ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			wp_send_json_error( 'Invalid date format: ' . $date );
+		}
+
+		$log_files = $this->logger->get_log_files();
+		if ( ! isset( $log_files[ $date ] ) ) {
+			wp_send_json_error( 'Log file not found for date: ' . $date );
+		}
+
+		$file_path = $log_files[ $date ];
+		if ( ! file_exists( $file_path ) ) {
+			wp_send_json_error( 'File does not exist: ' . $file_path );
+		}
+
+		if ( ! is_readable( $file_path ) ) {
+			wp_send_json_error( 'File is not readable: ' . $file_path . ' (Permissions: ' . decoct( fileperms( $file_path ) ) . ')' );
+		}
+
+		$content = $this->wp_filesystem->get_contents( $file_path );
+		if ( false === $content ) {
+			wp_send_json_error( 'Could not read file: ' . $file_path );
+		}
+
+		wp_send_json_success( $content );
 	}
 
 	/**
@@ -173,53 +220,6 @@ class Plugin_Autoupdate_Filter_Settings {
 	 * Render the settings page
 	 */
 	public function render_settings_page(): void {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		// Get available log files
-		$log_files = $this->logger->get_log_files();
-
-		?>
-		<div class="wrap">
-			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-
-			<form action="options.php" method="post">
-				<?php
-				settings_fields( 'plugin_autoupdate_filter' );
-				do_settings_sections( 'plugin_autoupdate_filter' );
-				submit_button();
-				?>
-			</form>
-
-			<?php if ( ! empty( $log_files ) ) : ?>
-				<div class="plugin-autoupdate-filter-logs">
-					<h2>Available Log Files</h2>
-					<div class="plugin-autoupdate-filter-logs-table-wrap">
-						<table class="widefat">
-							<thead>
-								<tr>
-									<th>Date</th>
-									<th>Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								<?php foreach ( $log_files as $date => $file_path ) : ?>
-									<tr>
-										<td><?php echo esc_html( $date ); ?></td>
-										<td>
-											<a href="<?php echo esc_url( content_url( str_replace( WP_CONTENT_DIR, '', $file_path ) ) ); ?>" class="button button-secondary" target="_blank">
-												View Log
-											</a>
-										</td>
-									</tr>
-								<?php endforeach; ?>
-							</tbody>
-						</table>
-					</div>
-				</div>
-			<?php endif; ?>
-		</div>
-		<?php
+		require_once PLUGIN_AUTOUPDATE_FILTER_PATH . 'admin/templates/settings-page.php';
 	}
 }

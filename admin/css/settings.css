@@ -26,3 +26,22 @@
 .plugin-autoupdate-filter-logs tbody tr:nth-child(odd) {
 	background-color: #f9f9f9;
 }
+
+.log-content {
+	margin-top: 1em;
+	background: #f8f9fa;
+	border: 1px solid #dee2e6;
+	border-radius: 4px;
+}
+
+.log-content pre {
+	padding: 1em;
+	margin: 0;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+#log-file-select {
+	min-width: 200px;
+}

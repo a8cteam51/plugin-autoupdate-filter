@@ -64,7 +64,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 			),
 		);
 
-		// let's go get the latest version number from GitHub
+		// Get latest version from GitHub
 		$response = wp_remote_get(
 			'https://api.github.com/repos/a8cteam51/plugin-autoupdate-filter/releases/latest',
 			array(
@@ -74,37 +74,49 @@ class Plugin_Autoupdate_Filter_Self_Update {
 
 		if ( is_wp_error( $response ) ) {
 			$update_info['Status'] = 'Error checking for updates: ' . $response->get_error_message();
-			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', 'self-update', $update_info );
+			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
 			return false;
 		}
 
-		$output                                     = json_decode( wp_remote_retrieve_body( $response ), true );
+		$output = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// Validate GitHub API response
+		if ( empty( $output ) || ! is_array( $output ) || ! isset( $output['tag_name'] ) ) {
+			$update_info['Status']   = 'Error: Invalid GitHub API response';
+			$update_info['Response'] = $output;
+			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
+			return false;
+		}
+
 		$new_version_number                         = $output['tag_name'];
 		$update_info['Version Info']['New Version'] = $new_version_number;
 
-		$is_update_available                                = version_compare( $plugin_data['Version'], $new_version_number, '<' );
-		$update_info['Update Controls']['Update Available'] = $is_update_available;
-
-		if ( ! $is_update_available ) {
+		// Skip if no actual update available
+		if ( $plugin_data['Version'] === $new_version_number ) {
 			$update_info['Status'] = 'No update available';
 			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
 			return false;
 		}
 
-		$new_url     = $output['html_url'];
-		$new_package = $output['assets'][0]['browser_download_url'];
+		// Validate required update data exists
+		if ( ! isset( $output['html_url'], $output['assets'][0]['browser_download_url'] ) ) {
+			$update_info['Status']   = 'Error: Missing required update data';
+			$update_info['Response'] = $output;
+			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
+			return false;
+		}
 
 		$update_info['Status']                         = 'Update available';
-		$update_info['Update Controls']['Update URL']  = $new_url;
-		$update_info['Update Controls']['Package URL'] = $new_package;
+		$update_info['Update Controls']['Update URL']  = $output['html_url'];
+		$update_info['Update Controls']['Package URL'] = $output['assets'][0]['browser_download_url'];
 
 		$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
 
 		return array(
 			'slug'    => $plugin_data['TextDomain'],
 			'version' => $new_version_number,
-			'url'     => $new_url,
-			'package' => $new_package,
+			'url'     => $output['html_url'],
+			'package' => $output['assets'][0]['browser_download_url'],
 		);
 	}
 }

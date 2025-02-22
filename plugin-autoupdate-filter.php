@@ -10,7 +10,7 @@
  * Plugin URI:      https://github.com/a8cteam51/plugin-autoupdate-filter
  * Update URI:      https://github.com/a8cteam51/plugin-autoupdate-filter
  * Description:     Filters whether autoupdates are on based on day/time and other settings.
- * Version:         1.6.5
+ * Version:         1.7.0
  * Requires PHP:    7.4
  * Author:          WordPress.com Special Projects
  * Author URI:      https://wpspecialprojects.wordpress.com
