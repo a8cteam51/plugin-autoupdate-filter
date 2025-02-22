@@ -16,9 +16,7 @@
  * Author URI:      https://wpspecialprojects.wordpress.com
  * License:         GPL v3 or later
  * License URI:     https://www.gnu.org/licenses/gpl-3.0.html
- * Network:         true
  * Text Domain:     plugin-autoupdate-filter
- * Domain Path:     /languages
  **/
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -32,7 +30,6 @@ if ( defined( 'PLUGIN_AUTOUPDATE_FILTER_PATH' ) ) {
 // Define plugin constants
 define( 'PLUGIN_AUTOUPDATE_FILTER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'PLUGIN_AUTOUPDATE_FILTER_FILE', __FILE__ );
-define( 'PLUGIN_AUTOUPDATE_FILTER_VERSION', '1.6.5' );
 
 // Load required files
 require_once PLUGIN_AUTOUPDATE_FILTER_PATH . 'includes/class-plugin-autoupdate-filter-logger.php';
@@ -92,9 +89,6 @@ function plugin_autoupdate_filter_activate() {
 		$logger = new Plugin_Autoupdate_Filter_Logger();
 		$logger->ensure_log_directory();
 	}
-
-	// Flush rewrite rules
-	flush_rewrite_rules();
 }
 register_activation_hook( __FILE__, 'plugin_autoupdate_filter_activate' );
 
@@ -104,9 +98,6 @@ register_activation_hook( __FILE__, 'plugin_autoupdate_filter_activate' );
 function plugin_autoupdate_filter_deactivate() {
 	// Clear the scheduled cleanup event
 	wp_clear_scheduled_hook( 'plugin_autoupdate_filter_cleanup_logs' );
-
-	// Flush rewrite rules
-	flush_rewrite_rules();
 }
 register_deactivation_hook( __FILE__, 'plugin_autoupdate_filter_deactivate' );
 
