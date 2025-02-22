@@ -5,13 +5,15 @@
 
 Controls and filters WordPress plugin auto-updates based on configurable rules.
 
-## Features
+## What's this?
+This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:
+1. It defaults autoupdates to be on. Keeping plugins up-to-date is one of the the first lines of defense against malicious attacks and technical debt.
+2. It provides various mechanisms by which we can turn off autoupdates, such as during specific days/times, for specific plugins, or centralized settings which can turn off all autoupdates.
 
-- Restricts plugin auto-updates to business hours
-- Enforces delays on updates after release
-- Supports canary sites for early updates
-- Integrates with OpsOasis for centralized control
-- Detailed logging of update decisions
+## Usage
+
+1. Download the .zip file from https://github.com/a8cteam51/plugin-autoupdate-filter/releases
+2. Via the wp-admin plugins page on your WordPress site, upload the zip file and activate the plugin
 
 ## Logging
 
@@ -25,20 +27,6 @@ Navigate to **Settings > Plugin Autoupdate Filter**
 
 - **Enable Logging**: Turn detailed logging on/off
 - **Log Retention**: Number of days to keep logs (1-60 days)
-
-## Integration
-
-Integrates with OpsOasis for centralized control of auto-updates across multiple sites. When OpsOasis disables updates, this is logged and updates are blocked.
-
-## What's this?
-This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:
-1. It defaults autoupdates to be on. Keeping plugins up-to-date is one of the the first lines of defense against malicious attacks and technical debt.
-2. It provides various mechanisms by which we can turn off autoupdates, such as during specific days/times, for specific plugins, or centralized settings which can turn off all autoupdates.
-
-## Usage
-
-1. Download the .zip file from https://github.com/a8cteam51/plugin-autoupdate-filter/releases
-2. Via the wp-admin plugins page on your WordPress site, upload the zip file and activate the plugin
 
 ### Notes on functionality
 
