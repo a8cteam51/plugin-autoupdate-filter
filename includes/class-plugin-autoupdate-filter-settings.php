@@ -114,14 +114,14 @@ class Plugin_Autoupdate_Filter_Settings {
 			'plugin-autoupdate-filter-admin',
 			plugins_url( 'admin/css/settings.css', PLUGIN_AUTOUPDATE_FILTER_FILE ),
 			array(),
-			PLUGIN_AUTOUPDATE_FILTER_VERSION
+			get_plugin_data( PLUGIN_AUTOUPDATE_FILTER_FILE )['Version']
 		);
 
 		wp_enqueue_script(
 			'plugin-autoupdate-filter-admin',
 			plugins_url( 'admin/js/settings.js', PLUGIN_AUTOUPDATE_FILTER_FILE ),
 			array( 'jquery' ),
-			PLUGIN_AUTOUPDATE_FILTER_VERSION,
+			get_plugin_data( PLUGIN_AUTOUPDATE_FILTER_FILE )['Version'],
 			true
 		);
 
