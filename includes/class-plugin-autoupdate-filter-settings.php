@@ -164,7 +164,7 @@ class Plugin_Autoupdate_Filter_Settings {
 			wp_send_json_error( 'File is not readable: ' . $file_path . ' (Permissions: ' . decoct( fileperms( $file_path ) ) . ')' );
 		}
 
-		$content = $this->wp_filesystem->get_contents( $file_path );
+		$content = $this->logger->get_log_content( $file_path );
 		if ( false === $content ) {
 			wp_send_json_error( 'Could not read file: ' . $file_path );
 		}

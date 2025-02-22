@@ -357,4 +357,18 @@ class Plugin_Autoupdate_Filter_Logger {
 
 		return $log_files;
 	}
+
+	/**
+	 * Get the contents of a log file
+	 *
+	 * @param string $file_path Path to the log file
+	 * @return string|false The file contents or false on failure
+	 */
+	public function get_log_content( string $file_path ) {
+		if ( ! $this->wp_filesystem ) {
+			return false;
+		}
+		
+		return $this->wp_filesystem->get_contents( $file_path );
+	}
 }
