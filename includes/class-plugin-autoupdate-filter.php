@@ -427,6 +427,20 @@ class Plugin_Autoupdate_Filter {
 		$email['to'] = 'concierge@wordpress.com';
 		return $email;
 	}
-}
 
-add_action( 'init', array( new Plugin_Autoupdate_Filter( new Plugin_Autoupdate_Filter_Logger() ), 'init' ) );
+	/**
+	 * Add settings link to plugin listing
+	 *
+	 * @param array $links Array of plugin action links
+	 * @return array Modified array of plugin action links
+	 */
+	public function add_settings_link( array $links ): array {
+		$settings_link = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'options-general.php?page=plugin-autoupdate-filter' ) ),
+			esc_html__( 'Settings', 'plugin-autoupdate-filter' )
+		);
+		array_unshift( $links, $settings_link );
+		return $links;
+	}
+}

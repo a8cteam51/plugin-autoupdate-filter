@@ -54,13 +54,23 @@ function plugin_autoupdate_filter_init() {
 
 	// Initialize main plugin functionality
 	$plugin = new Plugin_Autoupdate_Filter( $logger );
-	$plugin->init();
+	
+	// Add settings link (needs to be added before init)
+	add_filter(
+		'plugin_action_links_' . plugin_basename( __FILE__ ),
+		array( $plugin, 'add_settings_link' )
+	);
+	
+	// Initialize the rest of the plugin
+	add_action( 'init', array( $plugin, 'init' ) );
 
 	// Initialize self-update functionality
 	$self_update = new Plugin_Autoupdate_Filter_Self_Update( $logger );
 	$self_update->init();
 }
-add_action( 'init', 'plugin_autoupdate_filter_init' );
+
+// Run initialization on plugins_loaded instead of init
+add_action( 'plugins_loaded', 'plugin_autoupdate_filter_init' );
 
 /**
  * Plugin activation hook
