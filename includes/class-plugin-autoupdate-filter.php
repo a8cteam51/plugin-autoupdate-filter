@@ -168,6 +168,24 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_auto_update_specific_times( $update, $item ): bool {
+		if ( ! is_object( $item ) || ! isset( $item->slug ) || empty( $item->new_version ) ) {
+			$update_info = array(
+				'Status' => 'Update blocked - invalid update data',
+				'Update Controls' => array(
+					'Invalid Data' => array(
+						'Missing Slug' => ! isset( $item->slug ),
+						'Missing Version' => empty( $item->new_version ),
+					),
+					'Raw Item' => wp_json_encode( $item ),
+				),
+			);
+			$this->logger->log_update_attempt( 
+				$item->slug ?? 'unknown', 
+				$item->new_version ?? 'unknown', 
+				$update_info 
+			);
+			return false;
+		}
 		$holidays = array(
 			'christmas' => array(
 				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
@@ -259,7 +277,24 @@ class Plugin_Autoupdate_Filter {
 		if ( null === $update ) {
 			$update = false;
 		}
-
+		if ( ! is_object( $item ) || ! isset( $item->slug ) || empty( $item->new_version ) ) {
+			$update_info = array(
+				'Status' => 'Update blocked - invalid update data',
+				'Update Controls' => array(
+					'Invalid Data' => array(
+						'Missing Slug' => ! isset( $item->slug ),
+						'Missing Version' => empty( $item->new_version ),
+					),
+					'Raw Item' => wp_json_encode( $item ),
+				),
+			);
+			$this->logger->log_update_attempt( 
+				$item->slug ?? 'unknown', 
+				$item->new_version ?? 'unknown', 
+				$update_info 
+			);
+			return false;
+		}
 		$helpers = new Plugin_Autoupdate_Filter_Helpers( $this->logger );
 
 		$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
