@@ -274,12 +274,18 @@ class Plugin_Autoupdate_Filter_Logger {
 	 * Determine the final status based on all checks
 	 */
 	private function determine_final_status( array $details ): string {
-		if ( $details['Updates disabled by OpsOasis'] ||
-		! $details['Has Update Package'] ||
-		$details['Outside business hours'] ||
-		! $details['Delay passed'] ) {
-			return 'Autoupdate blocked';
+		if ( $details['Updates disabled by OpsOasis'] ) {
+			return 'Autoupdate blocked - disabled by OpsOasis';
 		}
+
+		if ( ! $details['Has Update Package'] ) {
+			return 'Autoupdate unavailable - no update package';
+		}
+
+		if ( $details['Outside business hours'] || ! $details['Delay passed'] ) {
+			return 'Autoupdate blocked - scheduling rules';
+		}
+
 		return 'Autoupdate allowed';
 	}
 
