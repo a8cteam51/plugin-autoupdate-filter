@@ -273,17 +273,17 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_enforce_delay( $update, $item ): bool {
-		error_log( 'Plugin Autoupdate Filter Debug - Raw Item: ' . print_r( $item, true ) );
 		// protect against non-bool being returned from this function
 		if ( null === $update ) {
 			$update = false;
 		}
-		if ( ! is_object( $item ) || ! isset( $item->slug ) || empty( $item->new_version ) ) {
+
+		// Check for required properties
+		if ( ! is_object( $item ) || empty( $item->new_version ) ) {
 			$update_info = array(
 				'Status' => 'Update blocked - invalid update data',
 				'Update Controls' => array(
 					'Invalid Data' => array(
-						'Missing Slug' => ! isset( $item->slug ),
 						'Missing Version' => empty( $item->new_version ),
 					),
 					'Raw Item' => wp_json_encode( $item ),
@@ -296,11 +296,19 @@ class Plugin_Autoupdate_Filter {
 			);
 			return false;
 		}
+
 		$helpers = new Plugin_Autoupdate_Filter_Helpers( $this->logger );
 
-		$plugin_file        = empty( $item->plugin ) ? '' : $item->plugin;
-		$plugin_slug        = empty( $item->slug ) ? '' : $item->slug;
-		$plugin_new_version = empty( $item->new_version ) ? '0.0.0' : $item->new_version;
+		// Try to get plugin file from either plugin property or id property
+		$plugin_file = $item->plugin ?? $item->id ?? '';
+		
+		// If plugin file is empty but we have a slug, try to construct the plugin file path
+		if (empty($plugin_file) && !empty($item->slug)) {
+			$plugin_file = $item->slug . '/' . $item->slug . '.php';
+		}
+
+		$plugin_slug = $item->slug ?? dirname($plugin_file);
+		$plugin_new_version = $item->new_version;
 
 		// Get current version
 		$current_version = $helpers->get_installed_plugin_version( $plugin_file );
