@@ -273,6 +273,7 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_enforce_delay( $update, $item ): bool {
+		error_log( 'Plugin Autoupdate Filter Debug - Raw Item: ' . print_r( $item, true ) );
 		// protect against non-bool being returned from this function
 		if ( null === $update ) {
 			$update = false;
@@ -312,6 +313,7 @@ class Plugin_Autoupdate_Filter {
 				'New Version'     => $plugin_new_version,
 			),
 			'Update Controls' => array(
+				'Has Update Package'           => ! empty( $item->package ),
 				'Is Canary Site'               => false,
 				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
 			),
@@ -324,18 +326,11 @@ class Plugin_Autoupdate_Filter {
 			return false;
 		}
 
-		// Check for WooCommerce.com plugins and their update availability
-		$is_woo_plugin = strpos( $plugin_file, 'woocommerce-' ) === 0 ||
-		strpos( $plugin_file, 'woocommerce.com' ) !== false;
-
-		$can_auto_update = empty( $plugin_file ) ||
-		strpos( $plugin_file, 'wordpress.org' ) !== false ||
-		( $is_woo_plugin && ! empty( $item->package ) );
-
-		// Then add the WooCommerce check
-		if ( $is_woo_plugin && empty( $item->package ) ) {
-			$update_info['Update Controls']['Is WooCommerce Extension'] = true;
-			$update_info['Update Controls']['Has Update Package']       = false;
+		// If no package is available (no paid license, or not connected to WooCommerce.com)
+		if ( empty( $item->package ) ) {
+			$update_info['Status'] = 'Update unavailable - no update package';
+			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
+			return false;
 		}
 
 		// Check for canary site status
