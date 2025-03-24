@@ -212,6 +212,26 @@ class Plugin_Autoupdate_Filter_Logger {
 			$checks['details']['Delay passed'] = false;
 		}
 
+		// Add package availability info if this is a non-wp.org plugin
+		if ( isset( $update_info['Update Controls']['Has Update Package'] ) && 
+			$update_info['Update Controls']['Has Update Package'] && 
+			isset( $update_info['Package URL'] ) && 
+			strpos( $update_info['Package URL'], 'wordpress.org' ) === false && 
+			strpos( $update_info['Package URL'], 'w.org' ) === false ) {
+			
+			$response = wp_remote_head( $update_info['Package URL'] );
+			$response_code = wp_remote_retrieve_response_code( $response );
+			
+			// Update the Has Update Package status based on accessibility
+			$checks['details']['Has Update Package'] = ( $response_code >= 200 && $response_code < 400 );
+			
+			// Add package status to the log
+			$checks['details']['Package Status'] = array(
+				'Response Code' => $response_code,
+				'Is Accessible' => $checks['details']['Has Update Package']
+			);
+		}
+
 		// If this is a final status, write the log
 		if ( $this->is_final_status( $update_info['Status'] ) ) {
 			$log_info = array(

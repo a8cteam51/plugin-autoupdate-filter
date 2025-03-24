@@ -303,11 +303,11 @@ class Plugin_Autoupdate_Filter {
 		$plugin_file = $item->plugin ?? $item->id ?? '';
 		
 		// If plugin file is empty but we have a slug, try to construct the plugin file path
-		if (empty($plugin_file) && !empty($item->slug)) {
+		if ( empty( $plugin_file ) && !empty( $item->slug ) ) {
 			$plugin_file = $item->slug . '/' . $item->slug . '.php';
 		}
 
-		$plugin_slug = $item->slug ?? dirname($plugin_file);
+		$plugin_slug        = $item->slug ?? dirname($plugin_file);
 		$plugin_new_version = $item->new_version;
 
 		// Get current version
@@ -325,18 +325,12 @@ class Plugin_Autoupdate_Filter {
 				'Is Canary Site'               => false,
 				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
 			),
+			'Package URL'     => $item->package ?? '',
 		);
 
 		// Check if updates are disabled globally
 		if ( $this->are_updates_disabled() ) {
 			$update_info['Status'] = 'Update blocked - disabled by OpsOasis';
-			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
-			return false;
-		}
-
-		// If no package is available (no paid license, or not connected to WooCommerce.com)
-		if ( empty( $item->package ) ) {
-			$update_info['Status'] = 'Update unavailable - no update package';
 			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
@@ -348,6 +342,7 @@ class Plugin_Autoupdate_Filter {
 
 		$update_info['Status'] = 'Auto-update scheduled';
 		$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
+
 		return $update;
 	}
 
