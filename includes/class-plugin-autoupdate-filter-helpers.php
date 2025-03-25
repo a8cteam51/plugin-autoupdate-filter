@@ -17,22 +17,10 @@ class Plugin_Autoupdate_Filter_Helpers {
 	private $plugins;
 
 	/**
-	 * @var Plugin_Autoupdate_Filter_Logger Logger instance
+	 * Constructor.
 	 */
-	private $logger;
-
-	/**
-	 * Initialize the helpers
-	 *
-	 * @param Plugin_Autoupdate_Filter_Logger $logger Logger instance
-	 */
-	public function __construct( Plugin_Autoupdate_Filter_Logger $logger ) {
-		if ( ! function_exists( 'get_plugins' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		}
-
-		$this->plugins = get_plugins();
-		$this->logger  = $logger;
+	public function __construct() {
+		// No logger required
 	}
 
 	/**
@@ -74,7 +62,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 
 		if ( '0.0.0' === $installed_version || '0.0.0' === $plugin_new_version ) {
 			$update_info['Status'] = 'Invalid version detected';
-			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
@@ -96,29 +83,34 @@ class Plugin_Autoupdate_Filter_Helpers {
 
 			if ( time() >= $update_allowed_after ) {
 				$update_info['Status'] = 'Update allowed - delay period passed';
-				$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 				return true;
 			}
 
 			$update_info['Status'] = 'Update blocked - still within delay period';
-			$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
 		$update_info['Status'] = 'Update allowed - point release';
-		$this->logger->log_update_attempt( $plugin_slug, $plugin_new_version, $update_info );
 		return true;
 	}
 
 	/**
-	 * Retrieve the current version of an installed plugin.
+	 * Get the installed version of a plugin.
 	 *
-	 * @param   string $plugin_file The relative path to the plugin file.
-	 *
-	 * @return  string Current version of the plugin or '0.0.0' if not found.
+	 * @param string $plugin_file The plugin file path.
+	 * @return string The plugin version or 'unknown' if not found.
 	 */
-	public function get_installed_plugin_version( string $plugin_file ): string {
-		return $this->plugins[ $plugin_file ]['Version'] ?? '0.0.0';
+	public function get_installed_plugin_version( $plugin_file ) {
+		if ( empty( $plugin_file ) ) {
+			return 'unknown';
+		}
+
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file );
+		return ! empty( $plugin_data['Version'] ) ? $plugin_data['Version'] : 'unknown';
 	}
 
 	/**

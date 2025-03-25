@@ -43,11 +43,17 @@ class Plugin_Autoupdate_Filter_Logger {
 	private $logged_plugins = array();
 
 	/**
+	 * @var Plugin_Autoupdate_Filter_Helpers Helpers instance
+	 */
+	private $helpers;
+
+	/**
 	 * Initialize the logger
 	 */
 	public function __construct() {
 		$upload_dir          = wp_upload_dir();
 		$this->log_directory = trailingslashit( $upload_dir['basedir'] ) . 'plugin-autoupdate-filter-logs';
+		$this->helpers       = new Plugin_Autoupdate_Filter_Helpers( $this );
 
 		// Initialize WP_Filesystem
 		if ( ! function_exists( 'WP_Filesystem' ) ) {
@@ -141,172 +147,82 @@ class Plugin_Autoupdate_Filter_Logger {
 	 * @return bool
 	 */
 	public function log_update_attempt( string $plugin_name, string $new_version, array $update_info ): bool {
-		if ( ! $this->is_logging_enabled() || ! $this->wp_filesystem ) {
-			return false;
-		}
+		$check_key = $plugin_name . '|' . $new_version;
 
-		// Get the current version
-		$current_version = $update_info['Version Info']['Current Version'] ?? 'unknown';
+		// Initialize or update the check entry
+		if ( ! isset( $this->update_checks[ $check_key ] ) ) {
+			$initial_status = ! empty( $update_info['Status'] ) 
+				? $update_info['Status']
+				: 'Update status unknown';
 
-		// Skip if versions are the same
-		if ( 'unknown' !== $current_version && $current_version === $new_version ) {
-			return true;
-		}
-
-		// Get today's log file
-		$log_date = gmdate( 'Y-m-d' );
-		$log_file = $this->log_directory . "/{$log_date}-plugin-autoupdate-filter.log";
-
-		// Check if we've already logged this plugin update attempt today
-		if ( $this->wp_filesystem->exists( $log_file ) ) {
-			$existing_content = $this->wp_filesystem->get_contents( $log_file );
-			$timestamp        = gmdate( 'Y-m-d\TH:i:s\Z' );
-			$search_string    = "[{$timestamp}] Plugin Update Attempt: {$plugin_name} {$new_version}";
-			if ( false !== strpos( $existing_content, $search_string ) ) {
-				return true;
-			}
-		}
-
-		// Initialize or update the checks for this plugin
-		if ( ! isset( $this->update_checks[ $plugin_name . '|' . $new_version ] ) ) {
-			$this->update_checks[ $plugin_name . '|' . $new_version ] = array(
+			$this->update_checks[ $check_key ] = array(
 				'timestamp'    => gmdate( 'Y-m-d\TH:i:s\Z' ),
 				'plugin_name'  => $plugin_name,
 				'version_info' => array(
-					'Current Version' => $current_version,
+					'Current Version' => 'unknown',
 					'New Version'     => $new_version,
 				),
 				'details'      => array(
-					'Has Update Package'           => true,
+					'Has Update Package'           => ! empty( $update_info['Details']['Has Update Package'] ),
 					'Outside business hours'       => false,
 					'Holiday period'               => false,
 					'Delay passed'                 => true,
 					'Updates disabled by OpsOasis' => false,
 				),
-			);
-		} elseif ( 'unknown' !== $current_version ) {
-			// Update current version if we now have it
-			$this->update_checks[ $plugin_name . '|' . $new_version ]['version_info']['Current Version'] = $current_version;
-		}
-
-		// Update the checks based on the status
-		$checks = &$this->update_checks[ $plugin_name . '|' . $new_version ];
-
-		// Check for OpsOasis block first
-		if ( isset( $update_info['Update Controls']['Updates disabled by OpsOasis'] ) &&
-		true === $update_info['Update Controls']['Updates disabled by OpsOasis'] ) {
-			$checks['details']['Updates disabled by OpsOasis'] = true;
-		} elseif ( false !== strpos( $update_info['Status'], 'disabled by OpsOasis' ) ) {
-			$checks['details']['Updates disabled by OpsOasis'] = true;
-		}
-
-		if ( false !== strpos( $update_info['Status'], 'outside business hours' ) ) {
-			$checks['details']['Outside business hours'] = true;
-		}
-
-		if ( isset( $update_info['Update Controls']['Has Update Package'] ) ) {
-			$checks['details']['Has Update Package'] = (bool) $update_info['Update Controls']['Has Update Package'];
-		}
-
-		if ( false !== strpos( $update_info['Status'], 'delayed' ) ) {
-			$checks['details']['Delay passed'] = false;
-		}
-
-		// Add package availability info if this is a non-wp.org plugin
-		if ( isset( $update_info['Update Controls']['Has Update Package'] ) && 
-			$update_info['Update Controls']['Has Update Package'] && 
-			isset( $update_info['Package URL'] ) && 
-			strpos( $update_info['Package URL'], 'wordpress.org' ) === false && 
-			strpos( $update_info['Package URL'], 'w.org' ) === false ) {
-			
-			$response = wp_remote_head( $update_info['Package URL'] );
-			$response_code = wp_remote_retrieve_response_code( $response );
-			
-			// Update the Has Update Package status based on accessibility
-			$checks['details']['Has Update Package'] = ( $response_code >= 200 && $response_code < 400 );
-			
-			// Add package status to the log
-			$checks['details']['Package Status'] = array(
-				'Response Code' => $response_code,
-				'Is Accessible' => $checks['details']['Has Update Package']
+				'status'       => $initial_status,
 			);
 		}
 
-		// If this is a final status, write the log
-		if ( $this->is_final_status( $update_info['Status'] ) ) {
-			$log_info = array(
-				'Status'       => $this->determine_final_status( $checks['details'] ),
-				'Version Info' => $checks['version_info'],
-				'Details'      => $checks['details'],
-			);
-
-			// Format the log entry
-			$timestamp  = $checks['timestamp'];
-			$log_entry  = "[{$timestamp}] Plugin Update Attempt: {$plugin_name} {$new_version}\n";
-			$log_entry .= wp_json_encode( $log_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n\n";
-
-			// Write to file
-			if ( ! $this->ensure_log_directory() ) {
-				return false;
-			}
-
-			// Append to log file
-			$existing_content = '';
-			if ( $this->wp_filesystem->exists( $log_file ) ) {
-				$existing_content = $this->wp_filesystem->get_contents( $log_file );
-			}
-			$full_content = $existing_content . $log_entry;
-			$result       = $this->wp_filesystem->put_contents( $log_file, $full_content, FS_CHMOD_FILE );
-
-			// Mark this plugin as logged using a transient that expires in 1 minute
-			if ( $result ) {
-				set_transient( $this->get_transient_key( $plugin_name . '|' . $new_version ), true, MINUTE_IN_SECONDS );
-				unset( $this->update_checks[ $plugin_name . '|' . $new_version ] );
-			}
-
-			return (bool) $result;
+		// Update with any new information
+		if ( ! empty( $update_info['Version Info'] ) ) {
+			$this->update_checks[ $check_key ]['version_info'] = $update_info['Version Info'];
 		}
 
-		return true;
-	}
+		if ( ! empty( $update_info['Details'] ) ) {
+			$this->update_checks[ $check_key ]['details'] = array_merge(
+				$this->update_checks[ $check_key ]['details'],
+				$update_info['Details']
+			);
+		}
 
-	/**
-	 * Check if this is a final status that should trigger log writing
-	 */
-	private function is_final_status( string $status ): bool {
-		$final_statuses = array(
-			'Auto-update skipped - WooCommerce.com connection required',
-			'Auto-update scheduled',
-			'Update complete',
-			'Update blocked - disabled by OpsOasis',
+		if ( ! empty( $update_info['Status'] ) ) {
+			$this->update_checks[ $check_key ]['status'] = $update_info['Status'];
+		}
+
+		if ( ! empty( $update_info['Update Tracking'] ) ) {
+			$this->update_checks[ $check_key ]['update_tracking'] = $update_info['Update Tracking'];
+		}
+
+		// Only proceed with logging if this is the final call
+		$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+		if (empty($backtrace[1]['function']) || $backtrace[1]['function'] !== 'track_final_update_decision') {
+			return true;
+		}
+
+		if ( ! $this->is_logging_enabled() || ! $this->ensure_log_directory() ) {
+			return false;
+		}
+
+		// Get today's log file path
+		$today = gmdate( 'Y-m-d' );
+		$log_file = trailingslashit( $this->log_directory ) . $today . '-plugin-autoupdate-filter.log';
+		
+		// Get existing content
+		$existing_content = $this->wp_filesystem->exists( $log_file ) 
+			? $this->wp_filesystem->get_contents( $log_file ) 
+			: '';
+
+		// Format and write the log entry
+		$log_entry = sprintf(
+			"[%s] Plugin Update Attempt: %s %s\n%s\n",
+			gmdate( 'Y-m-d\TH:i:s\Z' ),
+			$plugin_name,
+			$new_version,
+			wp_json_encode( $this->format_log_info( $this->update_checks[ $check_key ] ), JSON_PRETTY_PRINT )
 		);
 
-		foreach ( $final_statuses as $final_status ) {
-			if ( strpos( $status, $final_status ) === 0 ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Determine the final status based on all checks
-	 */
-	private function determine_final_status( array $details ): string {
-		if ( $details['Updates disabled by OpsOasis'] ) {
-			return 'Autoupdate blocked - disabled by OpsOasis';
-		}
-
-		if ( ! $details['Has Update Package'] ) {
-			return 'Autoupdate unavailable - no update package';
-		}
-
-		if ( $details['Outside business hours'] || ! $details['Delay passed'] ) {
-			return 'Autoupdate blocked - scheduling rules';
-		}
-
-		return 'Autoupdate allowed';
+		$full_content = $existing_content . $log_entry . "\n";
+		return (bool) $this->wp_filesystem->put_contents( $log_file, $full_content );
 	}
 
 	/**
@@ -396,5 +312,123 @@ class Plugin_Autoupdate_Filter_Logger {
 		}
 		
 		return $this->wp_filesystem->get_contents( $file_path );
+	}
+
+	/**
+	 * Add update process information to the update checks
+	 *
+	 * @param string $plugin_name The name of the plugin
+	 * @param string $version     The version of the plugin
+	 * @param array  $process_info The update process information
+	 */
+	public function add_update_process_info( string $plugin_name, string $version, array $process_info ): void {
+		$key = $plugin_name . '|' . $version;
+		
+		// If no update check exists, create one
+		if ( ! isset( $this->update_checks[ $key ] ) ) {
+			$this->update_checks[ $key ] = array(
+				'timestamp'    => gmdate( 'Y-m-d\TH:i:s\Z' ),
+				'plugin_name'  => $plugin_name,
+				'version_info' => array(
+					'Current Version' => 'unknown',
+					'New Version'     => $version,
+				),
+				'details'      => array(
+					'Has Update Package'           => true,
+					'Outside business hours'       => false,
+					'Holiday period'               => false,
+					'Delay passed'                 => true,
+					'Updates disabled by OpsOasis' => false,
+				),
+			);
+		}
+
+		// Add or merge the process info
+		if ( isset( $this->update_checks[ $key ]['update_process'] ) ) {
+			$this->update_checks[ $key ]['update_process'] = array_merge(
+				$this->update_checks[ $key ]['update_process'],
+				$process_info
+			);
+		} else {
+			$this->update_checks[ $key ]['update_process'] = $process_info;
+		}
+	}
+
+	// Modify the existing log_update_attempt method to include the update process info:
+	private function format_log_info(array $checks): array {
+		$formatted = array(
+			'Status'          => $checks['status'] ?? '',
+			'Version Info'    => $checks['version_info'] ?? array(),
+			'Details'         => $checks['details'] ?? array(),
+			'Update Tracking' => $checks['update_tracking'] ?? array()
+		);
+		
+		return $formatted;
+	}
+
+	/**
+	 * Get the plugin file path from the plugin slug
+	 *
+	 * @param string $plugin_slug The plugin slug
+	 * @return string|null The plugin file path or null if not found
+	 */
+	private function get_plugin_file( string $plugin_slug ): ?string {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugins = get_plugins();
+		
+		// Simple direct match first
+		foreach ( $plugins as $file => $data ) {
+			if ( strpos( $file, $plugin_slug ) !== false ) {
+				return $file;
+			}
+		}
+		
+		// For non-direct matches, try without prefixes
+		$clean_slug = str_replace( ['woocommerce-com-', 'woocommerce-'], '', $plugin_slug );
+		foreach ( $plugins as $file => $data ) {
+			if ( strpos( $file, $clean_slug ) !== false ) {
+				return $file;
+			}
+		}
+
+		return null;
+	}
+
+	private function get_current_version(string $plugin_slug): string {
+		// Get the plugin file path
+		$plugin_file = $this->get_plugin_file($plugin_slug);
+		if (!$plugin_file) {
+			return 'unknown';
+		}
+		
+		// Use the helper class method
+		return $this->helpers->get_installed_plugin_version($plugin_file);
+	}
+
+	private function check_package_status(string $plugin_slug, array $update_info): array {
+		// Only check package status for non-.org plugins
+		if (strpos($plugin_slug, 'woocommerce-com-') === 0 || !$this->is_wp_org_plugin($plugin_slug)) {
+			$package_url = $this->get_update_package_url($plugin_slug);
+			if ($package_url) {
+				$response = wp_remote_head($package_url);
+				$response_code = wp_remote_retrieve_response_code($response);
+				$is_accessible = $response_code === 200;
+				
+				$update_info['Package Status'] = [
+					'Response Code' => $response_code,
+					'Is Accessible' => $is_accessible
+				];
+			}
+		}
+		
+		return $update_info;
+	}
+
+	public function get_update_info(string $plugin_name, string $version): ?array {
+		$check_key = $plugin_name . '|' . $version;
+		return $this->update_checks[$check_key] ?? null;
 	}
 }
