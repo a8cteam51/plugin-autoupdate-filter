@@ -471,7 +471,6 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool|null
 	 */
 	public function track_final_update_decision( $update, $item ): ?bool {
-		
 		if (!is_object($item) || empty($item->slug)) {
 			return $update;
 		}
@@ -484,9 +483,23 @@ class Plugin_Autoupdate_Filter {
 		// Check if we have a package URL
 		$has_package = !empty($item->package);
 		$package_url = $has_package ? $item->package : '';
+		$status = $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package';
+		$response_code = null;
+
+		// Only check non-WordPress.org plugins
+		if ($has_package && !str_contains($package_url, 'downloads.wordpress.org')) {
+			$response = wp_safe_remote_head($package_url);
+			if (!is_wp_error($response)) {
+				$response_code = wp_remote_retrieve_response_code($response);
+				// If we get a 400-range response, update the status
+				if ($response_code >= 400 && $response_code < 500) {
+					$status = 'Autoupdate unavailable - no update package';
+				}
+			}
+		}
 		
 		$update_info = array(
-			'Status' => $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package',
+			'Status' => $status,
 			'Version Info' => array(
 				'Current Version' => $current_version,
 				'New Version'     => $item->new_version
@@ -494,6 +507,7 @@ class Plugin_Autoupdate_Filter {
 			'Details' => array(
 				'Has Update Package'           => $has_package,
 				'Package URL'                  => $package_url,
+				'Package Response Code'        => $response_code,
 				'Outside business hours'       => false,
 				'Holiday period'               => false,
 				'Delay passed'                 => true,
