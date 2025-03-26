@@ -281,7 +281,7 @@ class Plugin_Autoupdate_Filter {
 		// Check for required properties
 		if ( ! is_object( $item ) || empty( $item->new_version ) ) {
 			$update_info = array(
-				'Status'          => 'Update blocked - invalid update data',
+				'Status'          => 'Update invalid - missing update data',
 				'Update Controls' => array(
 					'Invalid Data' => array(
 						'Missing Version' => empty( $item->new_version ),
@@ -289,10 +289,8 @@ class Plugin_Autoupdate_Filter {
 					'Raw Item'     => wp_json_encode( $item ),
 				),
 			);
-			return false;
+			return $update;
 		}
-
-		$helpers = new Plugin_Autoupdate_Filter_Helpers();
 
 		// Try to get plugin file from either plugin property or id property
 		$plugin_file = $item->plugin ?? $item->id ?? '';
@@ -306,7 +304,7 @@ class Plugin_Autoupdate_Filter {
 		$plugin_new_version = $item->new_version;
 
 		// Get current version
-		$current_version = $helpers->get_installed_plugin_version( $plugin_file );
+		$current_version = $this->helpers->get_installed_plugin_version( $plugin_file );
 
 		// Initialize update info
 		$update_info = array(
@@ -324,6 +322,7 @@ class Plugin_Autoupdate_Filter {
 		// Check if updates are disabled globally
 		if ( $this->are_updates_disabled() ) {
 			$update_info['Status'] = 'Update blocked - disabled by OpsOasis';
+			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
@@ -332,8 +331,51 @@ class Plugin_Autoupdate_Filter {
 		$update_info['Update Controls']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
 			in_array( $site_url, $this->settings->canary_sites, true );
 
-		$update_info['Status'] = 'Auto-update scheduled';
+		if ( $update_info['Update Controls']['Is Canary Site'] ) {
+			$update_info['Status'] = 'Auto-update scheduled - canary site';
+			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
+			return $update;
+		}
 
+		// Apply delay logic
+		$has_delay_passed = $this->helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
+		$update_info['Details']['Delay passed'] = $has_delay_passed ?? true;
+
+		if ( false === $has_delay_passed ) {
+			$option_key = 'plugin_update_delays';
+			$delays     = get_option( $option_key, array() );
+			
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && 
+				is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) && 
+				( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) ) 
+			) {
+				$delay_date      = $delays[ $plugin_file ][ $plugin_new_version ];
+				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+				$formatted_date  = date_i18n( $datetime_format, $delay_date, true );
+
+				add_filter(
+					"in_plugin_update_message-{$plugin_file}",
+					function( $plugin_data, $response ) use ( $plugin_new_version, $formatted_date ) {
+						if ( ! empty( $response->package ) ) {
+							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . 
+								esc_html( $plugin_new_version ) . 
+								' is currently estimated to run after ' . 
+								esc_html( $formatted_date ) . ' UTC.';
+						}
+					},
+					10,
+					2
+				);
+			}
+			$update_info['Status'] = 'Update blocked - delay period not passed';
+			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
+			return false;
+		} elseif ( true === $has_delay_passed ) {
+			$this->helpers->clear_plugin_delay( $plugin_file );
+		}
+
+		$update_info['Status'] = 'Auto-update scheduled';
+		$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 		return $update;
 	}
 
