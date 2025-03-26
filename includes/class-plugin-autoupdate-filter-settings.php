@@ -113,7 +113,7 @@ class Plugin_Autoupdate_Filter_Settings {
 		wp_enqueue_style(
 			'plugin-autoupdate-filter-admin',
 			plugins_url( 'admin/css/settings.css', PLUGIN_AUTOUPDATE_FILTER_FILE ),
-			array(),
+			array( 'dashicons' ),
 			get_plugin_data( PLUGIN_AUTOUPDATE_FILTER_FILE )['Version']
 		);
 

@@ -45,3 +45,13 @@
 #log-file-select {
 	min-width: 200px;
 }
+
+#log-loading-spinner {
+	float: none;
+	margin: 4px 10px;
+	visibility: hidden;
+}
+
+#log-loading-spinner.is-active {
+	visibility: visible;
+}

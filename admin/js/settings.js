@@ -4,6 +4,7 @@
 	$( document ).ready( function() {
 		const $logContent = $( '#log-content' );
 		const $logSelect = $( '#log-file-select' );
+		const $spinner = $( '#log-loading-spinner' );
 
 		// Handle log file selection
 		$logSelect.on( 'change', function() {
@@ -13,6 +14,8 @@
 				return;
 			}
 
+			$spinner.addClass( 'is-active' );
+
 			$.ajax({
 				url: pluginAutoupdateFilter.ajaxUrl,
 				data: {
@@ -21,15 +24,17 @@
 					nonce: pluginAutoupdateFilter.nonce
 				},
 				success: function( response ) {
+					$spinner.removeClass( 'is-active' );
+
 					if ( response.success ) {
-						$logContent.find('pre').text( response.data );
+						$logContent.find( 'pre' ).text( response.data );
 						$logContent.slideDown();
 					} else {
-						// Show the actual error message
 						alert( 'Error loading log file: ' + response.data );
 					}
 				},
-				error: function(jqXHR, textStatus, errorThrown) {
+				error: function( jqXHR, textStatus, errorThrown ) {
+					$spinner.removeClass( 'is-active' );
 					alert( 'AJAX error: ' + textStatus + ' - ' + errorThrown );
 				}
 			});
@@ -39,7 +44,8 @@
 		$( 'input[name="plugin_autoupdate_filter_enable_logging"]' ).on( 'change', function() {
 			if ( ! this.checked ) {
 				$logContent.slideUp();
-				$logSelect.val('');
+				$logSelect.val( '' );
+				$spinner.removeClass( 'is-active' );
 			}
 		});
 	});

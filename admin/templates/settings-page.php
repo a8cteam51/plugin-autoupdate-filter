@@ -42,6 +42,7 @@ $retention_days  = get_option( 'plugin_autoupdate_filter_log_retention', 15 );
 						</option>
 					<?php endforeach; ?>
 				</select>
+				<span class="spinner" id="log-loading-spinner"></span>
 				<div id="log-content" class="log-content" style="display: none;">
 					<pre></pre>
 				</div>
