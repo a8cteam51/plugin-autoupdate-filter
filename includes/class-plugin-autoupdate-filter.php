@@ -94,7 +94,7 @@ class Plugin_Autoupdate_Filter {
 
 		// Add final filter check after all our other filters
 		add_filter( 'auto_update_plugin', array( $this, 'track_final_update_decision' ), PHP_INT_MAX, 2 );
-		
+
 		// Add update result tracking
 		add_action( 'upgrader_process_complete', array( $this, 'track_update_result' ), PHP_INT_MAX, 2 );
 	}
@@ -162,7 +162,7 @@ class Plugin_Autoupdate_Filter {
 
 		if ( isset( $this->settings->disable_all ) || null === $update ) {
 			$update_info['Status'] = 'Updates globally disabled';
-			$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
+			$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
 
@@ -234,7 +234,7 @@ class Plugin_Autoupdate_Filter {
 
 			if ( $holiday['start'] <= $now && $now <= $holiday['end'] ) {
 				$update_info['Status'] = 'Update blocked - holiday period';
-				$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
+				$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 				return false;
 			}
 		}
@@ -243,12 +243,12 @@ class Plugin_Autoupdate_Filter {
 				in_array( $day, $days_off, true ) ||
 				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
 			$update_info['Status'] = 'Update blocked - outside business hours';
-			$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
+			$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
 
 		$update_info['Status'] = 'Update allowed - within business hours';
-		$this->logger->log_update_attempt( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
+		$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 		return true;
 	}
 
@@ -276,12 +276,12 @@ class Plugin_Autoupdate_Filter {
 		// Check for required properties
 		if ( ! is_object( $item ) || empty( $item->new_version ) ) {
 			$update_info = array(
-				'Status' => 'Update blocked - invalid update data',
+				'Status'          => 'Update blocked - invalid update data',
 				'Update Controls' => array(
 					'Invalid Data' => array(
 						'Missing Version' => empty( $item->new_version ),
 					),
-					'Raw Item' => wp_json_encode( $item ),
+					'Raw Item'     => wp_json_encode( $item ),
 				),
 			);
 			return false;
@@ -291,13 +291,13 @@ class Plugin_Autoupdate_Filter {
 
 		// Try to get plugin file from either plugin property or id property
 		$plugin_file = $item->plugin ?? $item->id ?? '';
-		
+
 		// If plugin file is empty but we have a slug, try to construct the plugin file path
-		if ( empty( $plugin_file ) && !empty( $item->slug ) ) {
+		if ( empty( $plugin_file ) && ! empty( $item->slug ) ) {
 			$plugin_file = $item->slug . '/' . $item->slug . '.php';
 		}
 
-		$plugin_slug        = $item->slug ?? dirname($plugin_file);
+		$plugin_slug        = $item->slug ?? dirname( $plugin_file );
 		$plugin_new_version = $item->new_version;
 
 		// Get current version
@@ -471,56 +471,55 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool|null
 	 */
 	public function track_final_update_decision( $update, $item ): ?bool {
-		if (!is_object($item) || empty($item->slug)) {
+		if ( ! is_object( $item ) || empty( $item->slug ) ) {
 			return $update;
 		}
 
 		// Get current version using the plugin file from $item
-		$current_version = !empty($item->plugin) ? 
-			$this->helpers->get_installed_plugin_version($item->plugin) : 
+		$current_version = ! empty( $item->plugin ) ?
+			$this->helpers->get_installed_plugin_version( $item->plugin ) :
 			'unknown';
-		
+
 		// Check if we have a package URL
-		$has_package = !empty($item->package);
-		$package_url = $has_package ? $item->package : '';
-		$status = $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package';
+		$has_package   = ! empty( $item->package );
+		$package_url   = $has_package ? $item->package : '';
+		$status        = $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package';
 		$response_code = null;
 
 		// Only check non-WordPress.org plugins
-		if ($has_package && !str_contains($package_url, 'downloads.wordpress.org')) {
-			$response = wp_safe_remote_head($package_url);
-			if (!is_wp_error($response)) {
-				$response_code = wp_remote_retrieve_response_code($response);
+		if ( $has_package && ! str_contains( $package_url, 'downloads.wordpress.org' ) ) {
+			$response = wp_safe_remote_head( $package_url );
+			if ( ! is_wp_error( $response ) ) {
+				$response_code = wp_remote_retrieve_response_code( $response );
 				// If we get a 400-range response, update the status
-				if ($response_code >= 400 && $response_code < 500) {
+				if ( $response_code >= 400 && $response_code < 500 ) {
 					$status = 'Autoupdate unavailable - no update package';
 				}
 			}
 		}
-		
+
 		$update_info = array(
-			'Status' => $status,
-			'Version Info' => array(
+			'Status'          => $status,
+			'Version Info'    => array(
 				'Current Version' => $current_version,
-				'New Version'     => $item->new_version
+				'New Version'     => $item->new_version,
 			),
-			'Details' => array(
+			'Details'         => array(
 				'Has Update Package'           => $has_package,
 				'Package URL'                  => $package_url,
 				'Package Response Code'        => $response_code,
 				'Outside business hours'       => false,
 				'Holiday period'               => false,
 				'Delay passed'                 => true,
-				'Updates disabled by OpsOasis' => false
+				'Updates disabled by OpsOasis' => false,
 			),
 			'Update Tracking' => array(
 				'Attempt Status' => 'Pending',
-				'Was Attempted'  => false
-			)
+				'Was Attempted'  => false,
+			),
 		);
 
-		// Log the update attempt
-		$this->logger->log_update_attempt($item->slug, $item->new_version, $update_info);
+		$this->logger->write_to_log( $item->slug, $item->new_version, $update_info );
 
 		return $update;
 	}
@@ -546,13 +545,13 @@ class Plugin_Autoupdate_Filter {
 
 		// Get the plugin data
 		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file );
-		$version = $plugin_data['Version'] ?? '';
+		$version     = $plugin_data['Version'] ?? '';
 
 		$result_info = array(
 			'Update Result' => array(
-				'Status' => $upgrader->plugin_info() ? 'Success' : 'Failed',
+				'Status'    => $upgrader->plugin_info() ? 'Success' : 'Failed',
 				'Attempted' => true,
-			)
+			),
 		);
 
 		if ( is_wp_error( $upgrader->skin->result ) ) {
@@ -562,19 +561,19 @@ class Plugin_Autoupdate_Filter {
 		$this->logger->add_update_process_info( $plugin_slug, $version, $result_info );
 	}
 
-	private function get_plugin_file(string $plugin_slug): ?string {
-		if (!function_exists('get_plugins')) {
+	private function get_plugin_file( string $plugin_slug ): ?string {
+		if ( ! function_exists( 'get_plugins' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
 		$plugins = get_plugins();
 
 		// Try to find the plugin by matching the slug in the filepath
-		foreach ($plugins as $file => $data) {
+		foreach ( $plugins as $file => $data ) {
 			// Remove common prefixes from the slug for matching
-			$clean_slug = str_replace(['woocommerce-com-'], '', $plugin_slug);
-			
-			if (strpos($file, $clean_slug) !== false) {
+			$clean_slug = str_replace( array( 'woocommerce-com-' ), '', $plugin_slug );
+
+			if ( strpos( $file, $clean_slug ) !== false ) {
 				return $file;
 			}
 		}
@@ -582,7 +581,7 @@ class Plugin_Autoupdate_Filter {
 		return null;
 	}
 
-	private function get_current_version(string $plugin_slug): string {
+	private function get_current_version( string $plugin_slug ): string {
 		$plugin_file = $this->get_plugin_file( $plugin_slug );
 		if ( $plugin_file ) {
 			$helpers = new Plugin_Autoupdate_Filter_Helpers();

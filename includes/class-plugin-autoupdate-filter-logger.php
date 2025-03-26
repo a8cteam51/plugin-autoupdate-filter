@@ -139,19 +139,19 @@ class Plugin_Autoupdate_Filter_Logger {
 	}
 
 	/**
-	 * Log a plugin update attempt
+	 * Track update information without logging
 	 *
 	 * @param string $plugin_name    The name of the plugin
 	 * @param string $new_version    The version being updated to
 	 * @param array  $update_info    Array of update information
 	 * @return bool
 	 */
-	public function log_update_attempt( string $plugin_name, string $new_version, array $update_info ): bool {
+	public function track_update_info( string $plugin_name, string $new_version, array $update_info ): bool {
 		$check_key = $plugin_name . '|' . $new_version;
 
 		// Initialize or update the check entry
 		if ( ! isset( $this->update_checks[ $check_key ] ) ) {
-			$initial_status = ! empty( $update_info['Status'] ) 
+			$initial_status = ! empty( $update_info['Status'] )
 				? $update_info['Status']
 				: 'Update status unknown';
 
@@ -193,23 +193,33 @@ class Plugin_Autoupdate_Filter_Logger {
 			$this->update_checks[ $check_key ]['update_tracking'] = $update_info['Update Tracking'];
 		}
 
-		// Only proceed with logging if this is the final call
-		$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-		if (empty($backtrace[1]['function']) || $backtrace[1]['function'] !== 'track_final_update_decision') {
-			return true;
-		}
+		return true;
+	}
 
+	/**
+	 * Write the final update decision to the log
+	 *
+	 * @param string $plugin_name    The name of the plugin
+	 * @param string $new_version    The version being updated to
+	 * @param array  $update_info    Array of update information
+	 * @return bool
+	 */
+	public function write_to_log( string $plugin_name, string $new_version, array $update_info ): bool {
 		if ( ! $this->is_logging_enabled() || ! $this->ensure_log_directory() ) {
 			return false;
 		}
 
+		// Track the final information before logging
+		$this->track_update_info( $plugin_name, $new_version, $update_info );
+		$check_key = $plugin_name . '|' . $new_version;
+
 		// Get today's log file path
-		$today = gmdate( 'Y-m-d' );
+		$today    = gmdate( 'Y-m-d' );
 		$log_file = trailingslashit( $this->log_directory ) . $today . '-plugin-autoupdate-filter.log';
-		
+
 		// Get existing content
-		$existing_content = $this->wp_filesystem->exists( $log_file ) 
-			? $this->wp_filesystem->get_contents( $log_file ) 
+		$existing_content = $this->wp_filesystem->exists( $log_file )
+			? $this->wp_filesystem->get_contents( $log_file )
 			: '';
 
 		// Format and write the log entry
@@ -310,7 +320,7 @@ class Plugin_Autoupdate_Filter_Logger {
 		if ( ! $this->wp_filesystem ) {
 			return false;
 		}
-		
+
 		return $this->wp_filesystem->get_contents( $file_path );
 	}
 
@@ -323,7 +333,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	 */
 	public function add_update_process_info( string $plugin_name, string $version, array $process_info ): void {
 		$key = $plugin_name . '|' . $version;
-		
+
 		// If no update check exists, create one
 		if ( ! isset( $this->update_checks[ $key ] ) ) {
 			$this->update_checks[ $key ] = array(
@@ -355,14 +365,14 @@ class Plugin_Autoupdate_Filter_Logger {
 	}
 
 	// Modify the existing log_update_attempt method to include the update process info:
-	private function format_log_info(array $checks): array {
+	private function format_log_info( array $checks ): array {
 		$formatted = array(
 			'Status'          => $checks['status'] ?? '',
 			'Version Info'    => $checks['version_info'] ?? array(),
 			'Details'         => $checks['details'] ?? array(),
-			'Update Tracking' => $checks['update_tracking'] ?? array()
+			'Update Tracking' => $checks['update_tracking'] ?? array(),
 		);
-		
+
 		return $formatted;
 	}
 
@@ -378,16 +388,16 @@ class Plugin_Autoupdate_Filter_Logger {
 		}
 
 		$plugins = get_plugins();
-		
+
 		// Simple direct match first
 		foreach ( $plugins as $file => $data ) {
 			if ( strpos( $file, $plugin_slug ) !== false ) {
 				return $file;
 			}
 		}
-		
+
 		// For non-direct matches, try without prefixes
-		$clean_slug = str_replace( ['woocommerce-com-', 'woocommerce-'], '', $plugin_slug );
+		$clean_slug = str_replace( array( 'woocommerce-com-', 'woocommerce-' ), '', $plugin_slug );
 		foreach ( $plugins as $file => $data ) {
 			if ( strpos( $file, $clean_slug ) !== false ) {
 				return $file;
@@ -397,38 +407,41 @@ class Plugin_Autoupdate_Filter_Logger {
 		return null;
 	}
 
-	private function get_current_version(string $plugin_slug): string {
+	private function get_current_version( string $plugin_slug ): string {
 		// Get the plugin file path
-		$plugin_file = $this->get_plugin_file($plugin_slug);
-		if (!$plugin_file) {
+		$plugin_file = $this->get_plugin_file( $plugin_slug );
+		if ( ! $plugin_file ) {
 			return 'unknown';
 		}
-		
+
 		// Use the helper class method
-		return $this->helpers->get_installed_plugin_version($plugin_file);
+		return $this->helpers->get_installed_plugin_version( $plugin_file );
 	}
 
-	private function check_package_status(string $plugin_slug, array $update_info): array {
+	private function check_package_status( string $plugin_slug, array $update_info ): array {
 		// Only check package status for non-.org plugins
-		if (strpos($plugin_slug, 'woocommerce-com-') === 0 || !$this->is_wp_org_plugin($plugin_slug)) {
-			$package_url = $this->get_update_package_url($plugin_slug);
-			if ($package_url) {
-				$response = wp_remote_head($package_url);
-				$response_code = wp_remote_retrieve_response_code($response);
-				$is_accessible = $response_code === 200;
-				
-				$update_info['Package Status'] = [
+		if ( 0 === strpos( $plugin_slug, 'woocommerce-com-' ) || ! $this->is_wp_org_plugin( $plugin_slug ) ) {
+			$package_url = $this->get_update_package_url( $plugin_slug );
+			if ( $package_url ) {
+				$response      = wp_remote_head( $package_url );
+				$response_code = wp_remote_retrieve_response_code( $response );
+				$is_accessible = false;
+				if ( 200 === $response_code ) {
+					$is_accessible = true;
+				}
+
+				$update_info['Package Status'] = array(
 					'Response Code' => $response_code,
-					'Is Accessible' => $is_accessible
-				];
+					'Is Accessible' => $is_accessible,
+				);
 			}
 		}
-		
+
 		return $update_info;
 	}
 
-	public function get_update_info(string $plugin_name, string $version): ?array {
+	public function get_update_info( string $plugin_name, string $version ): ?array {
 		$check_key = $plugin_name . '|' . $version;
-		return $this->update_checks[$check_key] ?? null;
+		return $this->update_checks[ $check_key ] ?? null;
 	}
 }

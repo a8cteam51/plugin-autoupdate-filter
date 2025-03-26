@@ -74,7 +74,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 
 		if ( is_wp_error( $response ) ) {
 			$update_info['Status'] = 'Error checking for updates: ' . $response->get_error_message();
-			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
+			$this->logger->track_update_info( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
 			return false;
 		}
 
@@ -84,7 +84,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		if ( empty( $output ) || ! is_array( $output ) || ! isset( $output['tag_name'] ) ) {
 			$update_info['Status']   = 'Error: Invalid GitHub API response';
 			$update_info['Response'] = $output;
-			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
+			$this->logger->track_update_info( 'plugin-autoupdate-filter', $plugin_data['Version'], $update_info );
 			return false;
 		}
 
@@ -94,7 +94,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		// Skip if no actual update available
 		if ( $plugin_data['Version'] === $new_version_number ) {
 			$update_info['Status'] = 'No update available';
-			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
+			$this->logger->track_update_info( 'plugin-autoupdate-filter', $new_version_number, $update_info );
 			return false;
 		}
 
@@ -102,7 +102,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		if ( ! isset( $output['html_url'], $output['assets'][0]['browser_download_url'] ) ) {
 			$update_info['Status']   = 'Error: Missing required update data';
 			$update_info['Response'] = $output;
-			$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
+			$this->logger->track_update_info( 'plugin-autoupdate-filter', $new_version_number, $update_info );
 			return false;
 		}
 
@@ -110,7 +110,7 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		$update_info['Update Controls']['Update URL']  = $output['html_url'];
 		$update_info['Update Controls']['Package URL'] = $output['assets'][0]['browser_download_url'];
 
-		$this->logger->log_update_attempt( 'plugin-autoupdate-filter', $new_version_number, $update_info );
+		$this->logger->track_update_info( 'plugin-autoupdate-filter', $new_version_number, $update_info );
 
 		return array(
 			'slug'    => $plugin_data['TextDomain'],
@@ -121,7 +121,6 @@ class Plugin_Autoupdate_Filter_Self_Update {
 	}
 }
 
-// Initialize the class with the logger
 add_action(
 	'init',
 	function() {

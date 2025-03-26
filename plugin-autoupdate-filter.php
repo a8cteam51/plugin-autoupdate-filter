@@ -51,13 +51,13 @@ function plugin_autoupdate_filter_init() {
 
 	// Initialize main plugin functionality
 	$plugin = new Plugin_Autoupdate_Filter( $logger );
-	
+
 	// Add settings link (needs to be added before init)
 	add_filter(
 		'plugin_action_links_' . plugin_basename( __FILE__ ),
 		array( $plugin, 'add_settings_link' )
 	);
-	
+
 	// Initialize the rest of the plugin
 	add_action( 'init', array( $plugin, 'init' ) );
 
