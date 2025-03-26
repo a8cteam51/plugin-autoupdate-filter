@@ -101,6 +101,9 @@ class Plugin_Autoupdate_Filter {
 
 	/**
 	 * Load settings from the centralized settings page
+	 *
+	 * @return stdClass Settings object
+	 * @throws RuntimeException|Exception If settings cannot be retrieved
 	 */
 	private function get_auto_update_settings(): stdClass {
 		// Try getting the settings from the transient first
@@ -254,6 +257,8 @@ class Plugin_Autoupdate_Filter {
 
 	/**
 	 * Check if updates are disabled globally
+	 *
+	 * @return bool True if updates are disabled, false otherwise
 	 */
 	private function are_updates_disabled(): bool {
 		return isset( $this->settings->disable_all ) && '1' === $this->settings->disable_all;
@@ -468,7 +473,8 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @param bool|null $update Whether to update the plugin
 	 * @param object    $item   The plugin update object
-	 * @return bool|null
+	 * 
+	 * @return bool|null The final update decision
 	 */
 	public function track_final_update_decision( $update, $item ): ?bool {
 		if ( ! is_object( $item ) || empty( $item->slug ) ) {
@@ -559,34 +565,5 @@ class Plugin_Autoupdate_Filter {
 		}
 
 		$this->logger->add_update_process_info( $plugin_slug, $version, $result_info );
-	}
-
-	private function get_plugin_file( string $plugin_slug ): ?string {
-		if ( ! function_exists( 'get_plugins' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		}
-
-		$plugins = get_plugins();
-
-		// Try to find the plugin by matching the slug in the filepath
-		foreach ( $plugins as $file => $data ) {
-			// Remove common prefixes from the slug for matching
-			$clean_slug = str_replace( array( 'woocommerce-com-' ), '', $plugin_slug );
-
-			if ( strpos( $file, $clean_slug ) !== false ) {
-				return $file;
-			}
-		}
-
-		return null;
-	}
-
-	private function get_current_version( string $plugin_slug ): string {
-		$plugin_file = $this->get_plugin_file( $plugin_slug );
-		if ( $plugin_file ) {
-			$helpers = new Plugin_Autoupdate_Filter_Helpers();
-			return $helpers->get_installed_plugin_version( $plugin_file );
-		}
-		return '';
 	}
 }

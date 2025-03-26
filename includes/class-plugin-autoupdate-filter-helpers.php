@@ -179,4 +179,35 @@ class Plugin_Autoupdate_Filter_Helpers {
 			update_option( $option_key, $delays );
 		}
 	}
+
+	/**
+	 * Get the plugin file path from the plugin slug
+	 *
+	 * @param string $plugin_slug The plugin slug
+	 * @return string|null The plugin file path or null if not found
+	 */
+	private function get_plugin_file( string $plugin_slug ): ?string {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugins = get_plugins();
+
+		// Simple direct match first
+		foreach ( $plugins as $file => $data ) {
+			if ( strpos( $file, $plugin_slug ) !== false ) {
+				return $file;
+			}
+		}
+
+		// For non-direct matches, try without prefixes
+		$clean_slug = str_replace( array( 'woocommerce-com-', 'woocommerce-' ), '', $plugin_slug );
+		foreach ( $plugins as $file => $data ) {
+			if ( strpos( $file, $clean_slug ) !== false ) {
+				return $file;
+			}
+		}
+
+		return null;
+	}
 }

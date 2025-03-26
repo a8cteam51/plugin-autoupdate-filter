@@ -176,7 +176,8 @@ class Plugin_Autoupdate_Filter_Settings {
 	 * Sanitize retention days setting
 	 *
 	 * @param mixed $value The value to sanitize
-	 * @return int
+	 * 
+	 * @return int Sanitized value between 1 and 60
 	 */
 	public function sanitize_retention_days( $value ): int {
 		$days = absint( $value );

@@ -53,7 +53,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	public function __construct() {
 		$upload_dir          = wp_upload_dir();
 		$this->log_directory = trailingslashit( $upload_dir['basedir'] ) . 'plugin-autoupdate-filter-logs';
-		$this->helpers       = new Plugin_Autoupdate_Filter_Helpers( $this );
+		$this->helpers       = new Plugin_Autoupdate_Filter_Helpers();
 
 		// Initialize WP_Filesystem
 		if ( ! function_exists( 'WP_Filesystem' ) ) {
@@ -325,6 +325,24 @@ class Plugin_Autoupdate_Filter_Logger {
 	}
 
 	/**
+	 * Format log information for output
+	 *
+	 * @param array $checks Array of update check information
+	 * 
+	 * @return array Formatted log information
+	 */
+	private function format_log_info( array $checks ): array {
+		$formatted = array(
+			'Status'          => $checks['status'] ?? '',
+			'Version Info'    => $checks['version_info'] ?? array(),
+			'Details'         => $checks['details'] ?? array(),
+			'Update Tracking' => $checks['update_tracking'] ?? array(),
+		);
+
+		return $formatted;
+	}
+
+	/**
 	 * Add update process information to the update checks
 	 *
 	 * @param string $plugin_name The name of the plugin
@@ -364,60 +382,14 @@ class Plugin_Autoupdate_Filter_Logger {
 		}
 	}
 
-	// Modify the existing log_update_attempt method to include the update process info:
-	private function format_log_info( array $checks ): array {
-		$formatted = array(
-			'Status'          => $checks['status'] ?? '',
-			'Version Info'    => $checks['version_info'] ?? array(),
-			'Details'         => $checks['details'] ?? array(),
-			'Update Tracking' => $checks['update_tracking'] ?? array(),
-		);
-
-		return $formatted;
-	}
-
 	/**
-	 * Get the plugin file path from the plugin slug
+	 * Check package status for non-WordPress.org plugins
 	 *
-	 * @param string $plugin_slug The plugin slug
-	 * @return string|null The plugin file path or null if not found
+	 * @param string $plugin_slug  The plugin slug
+	 * @param array  $update_info  Current update information
+	 * 
+	 * @return array Updated information with package status
 	 */
-	private function get_plugin_file( string $plugin_slug ): ?string {
-		if ( ! function_exists( 'get_plugins' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		}
-
-		$plugins = get_plugins();
-
-		// Simple direct match first
-		foreach ( $plugins as $file => $data ) {
-			if ( strpos( $file, $plugin_slug ) !== false ) {
-				return $file;
-			}
-		}
-
-		// For non-direct matches, try without prefixes
-		$clean_slug = str_replace( array( 'woocommerce-com-', 'woocommerce-' ), '', $plugin_slug );
-		foreach ( $plugins as $file => $data ) {
-			if ( strpos( $file, $clean_slug ) !== false ) {
-				return $file;
-			}
-		}
-
-		return null;
-	}
-
-	private function get_current_version( string $plugin_slug ): string {
-		// Get the plugin file path
-		$plugin_file = $this->get_plugin_file( $plugin_slug );
-		if ( ! $plugin_file ) {
-			return 'unknown';
-		}
-
-		// Use the helper class method
-		return $this->helpers->get_installed_plugin_version( $plugin_file );
-	}
-
 	private function check_package_status( string $plugin_slug, array $update_info ): array {
 		// Only check package status for non-.org plugins
 		if ( 0 === strpos( $plugin_slug, 'woocommerce-com-' ) || ! $this->is_wp_org_plugin( $plugin_slug ) ) {
@@ -440,6 +412,14 @@ class Plugin_Autoupdate_Filter_Logger {
 		return $update_info;
 	}
 
+	/**
+	 * Get update information for a specific plugin
+	 *
+	 * @param string $plugin_name The name of the plugin
+	 * @param string $version     The version being checked
+	 * 
+	 * @return array|null Update information or null if not found
+	 */
 	public function get_update_info( string $plugin_name, string $version ): ?array {
 		$check_key = $plugin_name . '|' . $version;
 		return $this->update_checks[ $check_key ] ?? null;
