@@ -313,7 +313,7 @@ class Plugin_Autoupdate_Filter {
 				'Current Version' => $current_version,
 				'New Version'     => $plugin_new_version,
 			),
-			'Update Controls' => array(
+			'Details'         => array(
 				'Is Canary Site'               => false,
 				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
 			),
@@ -328,10 +328,10 @@ class Plugin_Autoupdate_Filter {
 
 		// Check for canary site status
 		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
-		$update_info['Update Controls']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
+		$update_info['Details']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
 			in_array( $site_url, $this->settings->canary_sites, true );
 
-		if ( $update_info['Update Controls']['Is Canary Site'] ) {
+		if ( $update_info['Details']['Is Canary Site'] ) {
 			$update_info['Status'] = 'Auto-update scheduled - canary site';
 			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return $update;

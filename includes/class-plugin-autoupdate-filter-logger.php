@@ -168,6 +168,7 @@ class Plugin_Autoupdate_Filter_Logger {
 					'Holiday period'               => false,
 					'Delay passed'                 => true,
 					'Updates disabled by OpsOasis' => false,
+					'Is Canary Site'               => false,
 				),
 				'status'       => $initial_status,
 			);
@@ -367,6 +368,7 @@ class Plugin_Autoupdate_Filter_Logger {
 					'Holiday period'               => false,
 					'Delay passed'                 => true,
 					'Updates disabled by OpsOasis' => false,
+					'Is Canary Site'               => false,
 				),
 			);
 		}
