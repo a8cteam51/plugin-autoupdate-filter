@@ -79,7 +79,6 @@ class Plugin_Autoupdate_Filter_Helpers {
 		if ( $is_major_change ) {
 			$update_allowed_after                                   = $this->get_delay_date( $plugin_slug, $plugin_new_version, $delay_days, $plugin_file );
 			$update_info['Update Controls']['Update Allowed After'] = gmdate( 'Y-m-d\TH:i:s\Z', $update_allowed_after );
-			$update_info['Update Controls']['Current Time']         = gmdate( 'Y-m-d\TH:i:s\Z', time() );
 
 			if ( time() >= $update_allowed_after ) {
 				$update_info['Status'] = 'Update allowed - delay period passed';

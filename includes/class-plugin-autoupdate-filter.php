@@ -97,6 +97,9 @@ class Plugin_Autoupdate_Filter {
 
 		// Add update result tracking
 		add_action( 'upgrader_process_complete', array( $this, 'track_update_result' ), PHP_INT_MAX, 2 );
+
+		// Add filter to fix malformed update objects
+		add_filter( 'site_transient_update_plugins', array( $this, 'fix_malformed_update_objects' ), 9);
 	}
 
 	/**
@@ -220,7 +223,6 @@ class Plugin_Autoupdate_Filter {
 				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
 			$update_info['Filter Details'] = array(
 				'Outside business hours' => true,
-				'Current Time'          => $now,
 			);
 		}
 
@@ -525,14 +527,19 @@ class Plugin_Autoupdate_Filter {
 			$this->helpers->get_installed_plugin_version( $item->plugin ) :
 			'unknown';
 
+		// Skip logging if versions match
+		if ( $current_version === $item->new_version ) {
+			return $update;
+		}
+
 		// Check if we have a package URL
 		$has_package   = ! empty( $item->package );
 		$package_url   = $has_package ? $item->package : '';
 		$status        = $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package';
 		$response_code = null;
 
-		// Only check non-WordPress.org plugins
-		if ( $has_package && ! str_contains( $package_url, 'downloads.wordpress.org' ) ) {
+		// Check package response for all plugins with a package URL
+		if ( $has_package ) {
 			$response = wp_safe_remote_head( $package_url );
 			if ( ! is_wp_error( $response ) ) {
 				$response_code = wp_remote_retrieve_response_code( $response );
@@ -573,6 +580,30 @@ class Plugin_Autoupdate_Filter {
 		return $update;
 	}
 
+	/**
+	 * Fix malformed update objects that have incorrect slug/plugin properties
+	 *
+	 * @param object|bool $transient The update_plugins transient object
+	 * @return object|bool The modified transient object
+	 */
+	public function fix_malformed_update_objects( $transient ) {
+		if ( empty( $transient->response ) ) {
+			return $transient;
+		}
+
+		foreach ( $transient->response as $plugin_file => $update_data ) {
+			if ( !isset( $update_data->plugin ) ) {
+				if ( isset( $update_data->slug ) && strpos( $update_data->slug, '/' ) !== false ) {
+					$update_data->plugin = $update_data->slug;
+					$update_data->slug = dirname( $update_data->slug );
+				} else {
+					$update_data->plugin = $plugin_file;
+				}
+			}
+		}
+
+		return $transient;
+	}
 	/**
 	 * Track the result of the update process
 	 *
