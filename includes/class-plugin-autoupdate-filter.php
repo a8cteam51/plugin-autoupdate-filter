@@ -527,8 +527,8 @@ class Plugin_Autoupdate_Filter {
 			$this->helpers->get_installed_plugin_version( $item->plugin ) :
 			'unknown';
 
-		// Skip logging if versions match
-		if ( $current_version === $item->new_version ) {
+		// Skip logging if new version not higher
+		if ( $current_version >= $item->new_version ) {
 			return $update;
 		}
 
