@@ -156,33 +156,49 @@ class Plugin_Autoupdate_Filter_Logger {
 				: 'Update status unknown';
 
 			$this->update_checks[ $check_key ] = array(
-				'timestamp'    => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				'plugin_name'  => $plugin_name,
-				'version_info' => array(
+				'timestamp'   => gmdate( 'Y-m-d\TH:i:s\Z' ),
+				'plugin_name' => $plugin_name,
+				'status'      => $initial_status,
+				'Version Info' => array(
 					'Current Version' => 'unknown',
 					'New Version'     => $new_version,
 				),
-				'details'      => array(
-					'Has Update Package'           => ! empty( $update_info['Details']['Has Update Package'] ),
+				'Update Package' => array(
+					'Has Update Package'    => ! empty( $update_info['Details']['Has Update Package'] ),
+					'Package URL'           => '',
+					'Package Response Code' => null,
+				),
+				'Filter Details' => array(
+					'Updates disabled by OpsOasis' => false,
+					'Is Canary Site'               => false,
 					'Outside business hours'       => false,
 					'Holiday period'               => false,
 					'Delay passed'                 => true,
-					'Updates disabled by OpsOasis' => false,
-					'Is Canary Site'               => false,
+					'Scheduled Update Date'        => '',
 				),
-				'status'       => $initial_status,
+				'Update Tracking' => array(
+					'Attempt Status' => 'Pending',
+					'Was Attempted'  => false,
+				),
 			);
 		}
 
 		// Update with any new information
 		if ( ! empty( $update_info['Version Info'] ) ) {
-			$this->update_checks[ $check_key ]['version_info'] = $update_info['Version Info'];
+			$this->update_checks[ $check_key ]['Version Info'] = $update_info['Version Info'];
 		}
 
-		if ( ! empty( $update_info['Details'] ) ) {
-			$this->update_checks[ $check_key ]['details'] = array_merge(
-				$this->update_checks[ $check_key ]['details'],
-				$update_info['Details']
+		if ( ! empty( $update_info['Filter Details'] ) ) {
+			$this->update_checks[ $check_key ]['Filter Details'] = array_merge(
+				$this->update_checks[ $check_key ]['Filter Details'],
+				$update_info['Filter Details']
+			);
+		}
+
+		if ( ! empty( $update_info['Update Package'] ) ) {
+			$this->update_checks[ $check_key ]['Update Package'] = array_merge(
+				$this->update_checks[ $check_key ]['Update Package'],
+				$update_info['Update Package']
 			);
 		}
 
@@ -191,7 +207,7 @@ class Plugin_Autoupdate_Filter_Logger {
 		}
 
 		if ( ! empty( $update_info['Update Tracking'] ) ) {
-			$this->update_checks[ $check_key ]['update_tracking'] = $update_info['Update Tracking'];
+			$this->update_checks[ $check_key ]['Update Tracking'] = $update_info['Update Tracking'];
 		}
 
 		return true;
@@ -222,6 +238,22 @@ class Plugin_Autoupdate_Filter_Logger {
 		$existing_content = $this->wp_filesystem->exists( $log_file )
 			? $this->wp_filesystem->get_contents( $log_file )
 			: '';
+
+		// If we have tracked details, merge them while maintaining structure
+		if ( isset( $this->update_checks[ $check_key ] ) ) {
+			if ( ! empty( $this->update_checks[ $check_key ]['Filter Details'] ) ) {
+				$update_info['Filter Details'] = array_merge(
+					$update_info['Filter Details'],
+					$this->update_checks[ $check_key ]['Filter Details']
+				);
+			}
+			if ( ! empty( $this->update_checks[ $check_key ]['Version Info'] ) ) {
+				$update_info['Version Info'] = array_merge(
+					$update_info['Version Info'],
+					$this->update_checks[ $check_key ]['Version Info']
+				);
+			}
+		}
 
 		// Format and write the log entry
 		$log_entry = sprintf(
@@ -335,9 +367,13 @@ class Plugin_Autoupdate_Filter_Logger {
 	private function format_log_info( array $checks ): array {
 		$formatted = array(
 			'Status'          => $checks['status'] ?? '',
-			'Version Info'    => $checks['version_info'] ?? array(),
-			'Details'         => $checks['details'] ?? array(),
-			'Update Tracking' => $checks['update_tracking'] ?? array(),
+			'Version Info'    => $checks['Version Info'] ?? array(),
+			'Update Package'  => $checks['Update Package'] ?? array(),
+			'Filter Details' => $checks['Filter Details'] ?? array(),
+			'Update Tracking' => $checks['Update Tracking'] ?? array(
+				'Attempt Status' => 'Pending',
+				'Was Attempted'  => false,
+			),
 		);
 
 		return $formatted;

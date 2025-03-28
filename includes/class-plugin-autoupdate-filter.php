@@ -157,9 +157,9 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
 		$update_info = array(
-			'Status'          => 'Checking global updates status',
-			'Update Controls' => array(
-				'Global Updates Enabled' => ! isset( $this->settings->disable_all ),
+			'Status'         => 'Checking global updates status',
+			'Filter Details' => array(
+				'Updates disabled by OpsOasis' => isset( $this->settings->disable_all ),
 			),
 		);
 
@@ -218,24 +218,16 @@ class Plugin_Autoupdate_Filter {
 		if ( $hour < $hours['start'] || $hour > $hours['end'] ||
 				in_array( $day, $days_off, true ) ||
 				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
-			$update_info['Update Controls'] = array(
+			$update_info['Filter Details'] = array(
+				'Outside business hours' => true,
 				'Current Time'          => $now,
-				'Within Business Hours' => array(
-					'Hour Check'  => $hour >= $hours['start'] && $hour <= $hours['end'],
-					'Day Check'   => ! in_array( $day, $days_off, true ),
-					'Friday Rule' => 'Fri' !== $day || $hour <= $hours['friday_end'],
-				),
 			);
 		}
 
 		// Check holidays
 		foreach ( $holidays as $holiday_name => $holiday ) {
-			$update_info['Update Controls']['Holiday Status'][ $holiday_name ] = array(
-				'Period' => $holiday['start'] . ' to ' . $holiday['end'],
-				'Active' => $holiday['start'] <= $now && $now <= $holiday['end'],
-			);
-
 			if ( $holiday['start'] <= $now && $now <= $holiday['end'] ) {
+				$update_info['Filter Details']['Holiday period'] = true;
 				$update_info['Status'] = 'Update blocked - holiday period';
 				$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 				return false;
@@ -308,14 +300,15 @@ class Plugin_Autoupdate_Filter {
 
 		// Initialize update info
 		$update_info = array(
-			'Status'          => 'Checking update requirements',
-			'Version Info'    => array(
+			'Status'       => 'Checking update requirements',
+			'Version Info' => array(
 				'Current Version' => $current_version,
 				'New Version'     => $plugin_new_version,
 			),
-			'Details'         => array(
-				'Is Canary Site'               => false,
+			'Filter Details' => array(
 				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
+				'Is Canary Site'              => false,
+				'Delay passed'                => true,
 			),
 		);
 
@@ -328,10 +321,10 @@ class Plugin_Autoupdate_Filter {
 
 		// Check for canary site status
 		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
-		$update_info['Details']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
+		$update_info['Filter Details']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
 			in_array( $site_url, $this->settings->canary_sites, true );
 
-		if ( $update_info['Details']['Is Canary Site'] ) {
+		if ( $update_info['Filter Details']['Is Canary Site'] ) {
 			$update_info['Status'] = 'Auto-update scheduled - canary site';
 			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return $update;
@@ -339,8 +332,10 @@ class Plugin_Autoupdate_Filter {
 
 		// Apply delay logic
 		$has_delay_passed = $this->helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
-		$update_info['Details']['Delay passed'] = $has_delay_passed ?? true;
+		$update_info['Filter Details']['Delay passed'] = $has_delay_passed ?? true;
 
+		// Get the scheduled update date if there's a delay
+		$formatted_date = '';
 		if ( false === $has_delay_passed ) {
 			$option_key = 'plugin_update_delays';
 			$delays     = get_option( $option_key, array() );
@@ -352,6 +347,8 @@ class Plugin_Autoupdate_Filter {
 				$delay_date      = $delays[ $plugin_file ][ $plugin_new_version ];
 				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 				$formatted_date  = date_i18n( $datetime_format, $delay_date, true );
+
+				$update_info['Filter Details']['Scheduled Update Date'] = $formatted_date;
 
 				add_filter(
 					"in_plugin_update_message-{$plugin_file}",
@@ -552,14 +549,18 @@ class Plugin_Autoupdate_Filter {
 				'Current Version' => $current_version,
 				'New Version'     => $item->new_version,
 			),
-			'Details'         => array(
-				'Has Update Package'           => $has_package,
-				'Package URL'                  => $package_url,
-				'Package Response Code'        => $response_code,
+			'Update Package'  => array(
+				'Has Update Package'    => $has_package,
+				'Package URL'           => $package_url,
+				'Package Response Code' => $response_code,
+			),
+			'Filter Details'  => array(
+				'Updates disabled by OpsOasis' => false,
+				'Is Canary Site'               => false,
 				'Outside business hours'       => false,
 				'Holiday period'               => false,
 				'Delay passed'                 => true,
-				'Updates disabled by OpsOasis' => false,
+				'Scheduled Update Date'        => '',
 			),
 			'Update Tracking' => array(
 				'Attempt Status' => 'Pending',
