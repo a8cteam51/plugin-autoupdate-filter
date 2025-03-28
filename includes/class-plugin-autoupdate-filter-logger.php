@@ -95,7 +95,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	 * @return bool
 	 */
 	public function is_logging_enabled(): bool {
-		return (bool) get_option( 'plugin_autoupdate_filter_enable_logging', false );
+		return (bool) get_option( 'plugin_autoupdate_filter_enable_logging', true );
 	}
 
 	/**
@@ -278,7 +278,7 @@ class Plugin_Autoupdate_Filter_Logger {
 			return;
 		}
 
-		$retention_days = absint( get_option( 'plugin_autoupdate_filter_log_retention', 15 ) );
+		$retention_days = absint( get_option( 'plugin_autoupdate_filter_log_retention', 30 ) );
 		$retention_days = min( max( $retention_days, 1 ), 60 ); // Ensure between 1 and 60 days
 
 		$files = $this->wp_filesystem->dirlist( $this->log_directory );
