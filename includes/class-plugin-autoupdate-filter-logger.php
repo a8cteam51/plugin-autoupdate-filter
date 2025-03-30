@@ -156,19 +156,19 @@ class Plugin_Autoupdate_Filter_Logger {
 				: 'Update status unknown';
 
 			$this->update_checks[ $check_key ] = array(
-				'timestamp'   => gmdate( 'Y-m-d\TH:i:s\Z' ),
-				'plugin_name' => $plugin_name,
-				'status'      => $initial_status,
-				'Version Info' => array(
+				'timestamp'       => gmdate( 'Y-m-d\TH:i:s\Z' ),
+				'plugin_name'     => $plugin_name,
+				'status'          => $initial_status,
+				'Version Info'    => array(
 					'Current Version' => 'unknown',
 					'New Version'     => $new_version,
 				),
-				'Update Package' => array(
+				'Update Package'  => array(
 					'Has Update Package'    => ! empty( $update_info['Details']['Has Update Package'] ),
 					'Package URL'           => '',
 					'Package Response Code' => null,
 				),
-				'Filter Details' => array(
+				'Filter Details'  => array(
 					'Updates disabled by OpsOasis' => false,
 					'Is Canary Site'               => false,
 					'Outside business hours'       => false,
@@ -227,7 +227,11 @@ class Plugin_Autoupdate_Filter_Logger {
 		}
 
 		// Track the final information before logging
-		$this->track_update_info( $plugin_name, $new_version, $update_info );
+		$tracking_result = $this->track_update_info( $plugin_name, $new_version, $update_info );
+		if ( ! $tracking_result ) {
+			return false;
+		}
+
 		$check_key = $plugin_name . '|' . $new_version;
 
 		// Get today's log file path
@@ -235,24 +239,17 @@ class Plugin_Autoupdate_Filter_Logger {
 		$log_file = trailingslashit( $this->log_directory ) . $today . '-plugin-autoupdate-filter.log';
 
 		// Get existing content
-		$existing_content = $this->wp_filesystem->exists( $log_file )
-			? $this->wp_filesystem->get_contents( $log_file )
-			: '';
+		$existing_content = '';
+		if ( $this->wp_filesystem->exists( $log_file ) ) {
+			$existing_content = $this->wp_filesystem->get_contents( $log_file );
+			if ( false === $existing_content ) {
+				return false;
+			}
+		}
 
 		// If we have tracked details, merge them while maintaining structure
 		if ( isset( $this->update_checks[ $check_key ] ) ) {
-			if ( ! empty( $this->update_checks[ $check_key ]['Filter Details'] ) ) {
-				$update_info['Filter Details'] = array_merge(
-					$update_info['Filter Details'],
-					$this->update_checks[ $check_key ]['Filter Details']
-				);
-			}
-			if ( ! empty( $this->update_checks[ $check_key ]['Version Info'] ) ) {
-				$update_info['Version Info'] = array_merge(
-					$update_info['Version Info'],
-					$this->update_checks[ $check_key ]['Version Info']
-				);
-			}
+			$update_info = array_replace_recursive( $update_info, $this->update_checks[ $check_key ] );
 		}
 
 		// Format and write the log entry
@@ -261,7 +258,7 @@ class Plugin_Autoupdate_Filter_Logger {
 			gmdate( 'Y-m-d\TH:i:s\Z' ),
 			$plugin_name,
 			$new_version,
-			wp_json_encode( $this->format_log_info( $this->update_checks[ $check_key ] ), JSON_PRETTY_PRINT )
+			wp_json_encode( $this->format_log_info( $update_info ), JSON_PRETTY_PRINT )
 		);
 
 		$full_content = $existing_content . $log_entry . "\n";
@@ -361,7 +358,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	 * Format log information for output
 	 *
 	 * @param array $checks Array of update check information
-	 * 
+	 *
 	 * @return array Formatted log information
 	 */
 	private function format_log_info( array $checks ): array {
@@ -369,7 +366,7 @@ class Plugin_Autoupdate_Filter_Logger {
 			'Status'          => $checks['status'] ?? '',
 			'Version Info'    => $checks['Version Info'] ?? array(),
 			'Update Package'  => $checks['Update Package'] ?? array(),
-			'Filter Details' => $checks['Filter Details'] ?? array(),
+			'Filter Details'  => $checks['Filter Details'] ?? array(),
 			'Update Tracking' => $checks['Update Tracking'] ?? array(
 				'Attempt Status' => 'Pending',
 				'Was Attempted'  => false,
@@ -425,7 +422,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	 *
 	 * @param string $plugin_slug  The plugin slug
 	 * @param array  $update_info  Current update information
-	 * 
+	 *
 	 * @return array Updated information with package status
 	 */
 	private function check_package_status( string $plugin_slug, array $update_info ): array {
@@ -455,7 +452,7 @@ class Plugin_Autoupdate_Filter_Logger {
 	 *
 	 * @param string $plugin_name The name of the plugin
 	 * @param string $version     The version being checked
-	 * 
+	 *
 	 * @return array|null Update information or null if not found
 	 */
 	public function get_update_info( string $plugin_name, string $version ): ?array {

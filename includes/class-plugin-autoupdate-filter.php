@@ -99,7 +99,7 @@ class Plugin_Autoupdate_Filter {
 		add_action( 'upgrader_process_complete', array( $this, 'track_update_result' ), PHP_INT_MAX, 2 );
 
 		// Add filter to fix malformed update objects
-		add_filter( 'site_transient_update_plugins', array( $this, 'fix_malformed_update_objects' ), 9);
+		add_filter( 'site_transient_update_plugins', array( $this, 'fix_malformed_update_objects' ), 9 );
 	}
 
 	/**
@@ -160,14 +160,12 @@ class Plugin_Autoupdate_Filter {
 	 */
 	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
 		$update_info = array(
-			'Status'         => 'Checking global updates status',
 			'Filter Details' => array(
 				'Updates disabled by OpsOasis' => isset( $this->settings->disable_all ),
 			),
 		);
 
 		if ( isset( $this->settings->disable_all ) || null === $update ) {
-			$update_info['Status'] = 'Updates globally disabled';
 			$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
@@ -213,10 +211,6 @@ class Plugin_Autoupdate_Filter {
 		$days_off = array( 'Sat', 'Sun' );
 		$days_off = apply_filters( 'plugin_autoupdate_filter_days_off', $days_off );
 
-		$update_info = array(
-			'Status' => 'Checking business hours',
-		);
-
 		// Only add controls if update is blocked
 		if ( $hour < $hours['start'] || $hour > $hours['end'] ||
 				in_array( $day, $days_off, true ) ||
@@ -230,7 +224,6 @@ class Plugin_Autoupdate_Filter {
 		foreach ( $holidays as $holiday_name => $holiday ) {
 			if ( $holiday['start'] <= $now && $now <= $holiday['end'] ) {
 				$update_info['Filter Details']['Holiday period'] = true;
-				$update_info['Status'] = 'Update blocked - holiday period';
 				$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 				return false;
 			}
@@ -239,13 +232,10 @@ class Plugin_Autoupdate_Filter {
 		if ( $hour < $hours['start'] || $hour > $hours['end'] ||
 				in_array( $day, $days_off, true ) ||
 				( 'Fri' === $day && $hour > $hours['friday_end'] ) ) {
-			$update_info['Status'] = 'Update blocked - outside business hours';
 			$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 			return false;
 		}
 
-		$update_info['Status'] = 'Update allowed - within business hours';
-		$this->logger->track_update_info( $item->slug ?? 'unknown', $item->new_version ?? 'unknown', $update_info );
 		return true;
 	}
 
@@ -302,49 +292,46 @@ class Plugin_Autoupdate_Filter {
 
 		// Initialize update info
 		$update_info = array(
-			'Status'       => 'Checking update requirements',
-			'Version Info' => array(
+			'Version Info'   => array(
 				'Current Version' => $current_version,
 				'New Version'     => $plugin_new_version,
 			),
 			'Filter Details' => array(
 				'Updates disabled by OpsOasis' => $this->are_updates_disabled(),
-				'Is Canary Site'              => false,
-				'Delay passed'                => true,
+				'Is Canary Site'               => false,
+				'Delay passed'                 => true,
 			),
 		);
 
 		// Check if updates are disabled globally
 		if ( $this->are_updates_disabled() ) {
-			$update_info['Status'] = 'Update blocked - disabled by OpsOasis';
 			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		}
 
 		// Check for canary site status
-		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
+		$site_url                                        = wp_parse_url( home_url(), PHP_URL_HOST );
 		$update_info['Filter Details']['Is Canary Site'] = isset( $this->settings->canary_sites ) &&
 			in_array( $site_url, $this->settings->canary_sites, true );
 
 		if ( $update_info['Filter Details']['Is Canary Site'] ) {
-			$update_info['Status'] = 'Auto-update scheduled - canary site';
 			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return $update;
 		}
 
 		// Apply delay logic
-		$has_delay_passed = $this->helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
+		$has_delay_passed                              = $this->helpers->has_delay_passed( $plugin_slug, $plugin_new_version, $plugin_file );
 		$update_info['Filter Details']['Delay passed'] = $has_delay_passed ?? true;
 
 		// Get the scheduled update date if there's a delay
 		$formatted_date = '';
-		if ( false === $has_delay_passed ) {
+		if ( isset( $update_info['Filter Details']['Delay passed'] ) && false === $update_info['Filter Details']['Delay passed'] ) {
 			$option_key = 'plugin_update_delays';
 			$delays     = get_option( $option_key, array() );
-			
-			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) && 
-				is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) && 
-				( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) ) 
+
+			if ( isset( $delays[ $plugin_file ][ $plugin_new_version ] ) &&
+				is_numeric( $delays[ $plugin_file ][ $plugin_new_version ] ) &&
+				( ! empty( $plugin_file ) && is_plugin_active( $plugin_file ) )
 			) {
 				$delay_date      = $delays[ $plugin_file ][ $plugin_new_version ];
 				$datetime_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
@@ -356,9 +343,9 @@ class Plugin_Autoupdate_Filter {
 					"in_plugin_update_message-{$plugin_file}",
 					function( $plugin_data, $response ) use ( $plugin_new_version, $formatted_date ) {
 						if ( ! empty( $response->package ) ) {
-							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' . 
-								esc_html( $plugin_new_version ) . 
-								' is currently estimated to run after ' . 
+							echo ' For stability, autoupdates operate on a slight delay. Autoupdate to version ' .
+								esc_html( $plugin_new_version ) .
+								' is currently estimated to run after ' .
 								esc_html( $formatted_date ) . ' UTC.';
 						}
 					},
@@ -366,14 +353,12 @@ class Plugin_Autoupdate_Filter {
 					2
 				);
 			}
-			$update_info['Status'] = 'Update blocked - delay period not passed';
 			$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 			return false;
 		} elseif ( true === $has_delay_passed ) {
 			$this->helpers->clear_plugin_delay( $plugin_file );
 		}
 
-		$update_info['Status'] = 'Auto-update scheduled';
 		$this->logger->track_update_info( $plugin_slug, $plugin_new_version, $update_info );
 		return $update;
 	}
@@ -514,7 +499,7 @@ class Plugin_Autoupdate_Filter {
 	 *
 	 * @param bool|null $update Whether to update the plugin
 	 * @param object    $item   The plugin update object
-	 * 
+	 *
 	 * @return bool|null The final update decision
 	 */
 	public function track_final_update_decision( $update, $item ): ?bool {
@@ -532,25 +517,39 @@ class Plugin_Autoupdate_Filter {
 			return $update;
 		}
 
-		// Check if we have a package URL
+		// Get all our previously collected data
+		$update_info    = $this->logger->get_update_info( $item->slug, $item->new_version );
+		$filter_details = $update_info['Filter Details'] ?? array();
+
+		// Check package status
 		$has_package   = ! empty( $item->package );
 		$package_url   = $has_package ? $item->package : '';
-		$status        = $has_package ? 'Auto-update scheduled' : 'Autoupdate unavailable - no update package';
 		$response_code = null;
-
-		// Check package response for all plugins with a package URL
 		if ( $has_package ) {
 			$response = wp_safe_remote_head( $package_url );
 			if ( ! is_wp_error( $response ) ) {
 				$response_code = wp_remote_retrieve_response_code( $response );
-				// If we get a 400-range response, update the status
-				if ( $response_code >= 400 && $response_code < 500 ) {
-					$status = 'Autoupdate unavailable - no update package';
-				}
 			}
 		}
 
-		$update_info = array(
+		// Use our stored filter details to determine status in priority order
+		$status = 'Auto-update allowed';
+		if ( ! empty( $filter_details['Updates disabled by OpsOasis'] ) ) {
+			$status = 'Auto-update blocked - disabled by OpsOasis';
+		} elseif ( false === $has_package || ( $response_code >= 400 && $response_code < 500 ) ) {
+			$status = 'Auto-update unavailable - no valid update package';
+		} elseif ( isset( $filter_details['Delay passed'] ) && false === $filter_details['Delay passed'] ) {
+			$status = 'Auto-update blocked - delay period';
+		} elseif ( ! empty( $filter_details['Holiday period'] ) ) {
+			$status = 'Auto-update blocked - holiday period';
+		} elseif ( ! empty( $filter_details['Outside business hours'] ) ) {
+			$status = 'Auto-update blocked - outside business hours';
+		}
+
+		// Match the expected array structure from track_update_info
+		$final_update_info = array(
+			'timestamp'       => gmdate( 'Y-m-d\TH:i:s\Z' ),
+			'plugin_name'     => $item->slug,
 			'Status'          => $status,
 			'Version Info'    => array(
 				'Current Version' => $current_version,
@@ -561,21 +560,14 @@ class Plugin_Autoupdate_Filter {
 				'Package URL'           => $package_url,
 				'Package Response Code' => $response_code,
 			),
-			'Filter Details'  => array(
-				'Updates disabled by OpsOasis' => false,
-				'Is Canary Site'               => false,
-				'Outside business hours'       => false,
-				'Holiday period'               => false,
-				'Delay passed'                 => true,
-				'Scheduled Update Date'        => '',
-			),
+			'Filter Details'  => $filter_details,
 			'Update Tracking' => array(
 				'Attempt Status' => 'Pending',
 				'Was Attempted'  => false,
 			),
 		);
 
-		$this->logger->write_to_log( $item->slug, $item->new_version, $update_info );
+		$this->logger->write_to_log( $item->slug, $item->new_version, $final_update_info );
 
 		return $update;
 	}
@@ -592,10 +584,10 @@ class Plugin_Autoupdate_Filter {
 		}
 
 		foreach ( $transient->response as $plugin_file => $update_data ) {
-			if ( !isset( $update_data->plugin ) ) {
+			if ( ! isset( $update_data->plugin ) ) {
 				if ( isset( $update_data->slug ) && strpos( $update_data->slug, '/' ) !== false ) {
 					$update_data->plugin = $update_data->slug;
-					$update_data->slug = dirname( $update_data->slug );
+					$update_data->slug   = dirname( $update_data->slug );
 				} else {
 					$update_data->plugin = $plugin_file;
 				}
