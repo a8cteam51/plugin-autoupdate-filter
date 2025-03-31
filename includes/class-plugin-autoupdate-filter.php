@@ -159,6 +159,12 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_maybe_disable_all_autoupdates( $update, $item ): bool {
+		// Skip inactive plugins
+		$plugin_file = $item->plugin ?? $item->id ?? '';
+		if ( ! empty( $plugin_file ) && ! is_plugin_active( $plugin_file ) ) {
+			return false;
+		}
+
 		$update_info = array(
 			'Filter Details' => array(
 				'Updates disabled by OpsOasis' => isset( $this->settings->disable_all ),
@@ -182,6 +188,12 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_auto_update_specific_times( $update, $item ): bool {
+		// Skip inactive plugins
+		$plugin_file = $item->plugin ?? $item->id ?? '';
+		if ( ! empty( $plugin_file ) && ! is_plugin_active( $plugin_file ) ) {
+			return false;
+		}
+
 		if ( ! is_object( $item ) || ! isset( $item->slug ) || empty( $item->new_version ) ) {
 			return false;
 		}
@@ -257,6 +269,12 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_enforce_delay( $update, $item ): bool {
+		// Skip inactive plugins
+		$plugin_file = $item->plugin ?? $item->id ?? '';
+		if ( ! empty( $plugin_file ) && ! is_plugin_active( $plugin_file ) ) {
+			return false;
+		}
+
 		// protect against non-bool being returned from this function
 		if ( null === $update ) {
 			$update = false;
@@ -503,6 +521,12 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool|null The final update decision
 	 */
 	public function track_final_update_decision( $update, $item ): ?bool {
+		// Skip inactive plugins
+		$plugin_file = $item->plugin ?? $item->id ?? '';
+		if ( ! empty( $plugin_file ) && ! is_plugin_active( $plugin_file ) ) {
+			return false;
+		}
+
 		if ( ! is_object( $item ) || empty( $item->slug ) ) {
 			return $update;
 		}
