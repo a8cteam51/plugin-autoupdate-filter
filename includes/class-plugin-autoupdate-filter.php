@@ -63,11 +63,11 @@ class Plugin_Autoupdate_Filter {
 		}
 
 		// setup plugins and core to autoupdate _unless_ it's during specific day/time
-		add_filter( 'auto_update_plugin', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
-		add_filter( 'auto_update_core', array( $this, 'filter_auto_update_specific_times' ), 10, 2 );
+		add_filter( 'auto_update_plugin', array( $this, 'filter_auto_update_specific_times' ), 11, 2 );
+		add_filter( 'auto_update_core', array( $this, 'filter_auto_update_specific_times' ), 11, 2 );
 
 		// enforce a delay on all plugin autoupdates, based on release date
-		add_filter( 'auto_update_plugin', array( $this, 'filter_enforce_delay' ), 11, 2 );
+		add_filter( 'auto_update_plugin', array( $this, 'filter_enforce_delay' ), 12, 2 );
 
 		// Replace automatic update wording on plugin management page in admin
 		add_filter( 'plugin_auto_update_setting_html', array( $this, 'filter_custom_setting_html' ), 11, 3 );
@@ -546,13 +546,28 @@ class Plugin_Autoupdate_Filter {
 		$filter_details = $update_info['Filter Details'] ?? array();
 
 		// Check package status
-		$has_package   = ! empty( $item->package );
-		$package_url   = $has_package ? $item->package : '';
-		$response_code = null;
-		if ( $has_package ) {
-			$response = wp_safe_remote_head( $package_url );
-			if ( ! is_wp_error( $response ) ) {
-				$response_code = wp_remote_retrieve_response_code( $response );
+		$has_package = ! empty( $item->package );
+		$package_url = $has_package ? $item->package : '';
+		
+		// For WooCommerce plugins, check the transient instead of the URL
+		if ( $has_package && ( 0 === strpos( $item->slug, 'woocommerce-' ) || 'woocommerce' === $item->slug ) ) {
+			$transient = get_site_transient( 'update_plugins' );
+			if ( isset( $transient->response[ $item->plugin ] ) ) {
+				$update_data = $transient->response[ $item->plugin ];
+				$has_package = ! empty( $update_data->package );
+				$package_url = $has_package ? $update_data->package : '';
+			} else {
+				$has_package = false;
+			}
+			$response_code = $has_package ? 200 : 403;
+		} else {
+			// For non-WooCommerce plugins, keep the URL check
+			$response_code = null;
+			if ( $has_package ) {
+				$response = wp_safe_remote_head( $package_url );
+				if ( ! is_wp_error( $response ) ) {
+					$response_code = wp_remote_retrieve_response_code( $response );
+				}
 			}
 		}
 
