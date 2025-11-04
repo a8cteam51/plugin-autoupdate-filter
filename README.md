@@ -2,7 +2,8 @@
 |--------------------------------------------|
 
 # Plugin Autoupdate Filter
-Filters whether autoupdates are on based on day/time and other settings.
+
+Controls and filters WordPress plugin auto-updates based on configurable rules.
 
 ## What's this?
 This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:
@@ -13,6 +14,19 @@ This is a plugin that the WordPress Special Projects team uses on many of their 
 
 1. Download the .zip file from https://github.com/a8cteam51/plugin-autoupdate-filter/releases
 2. Via the wp-admin plugins page on your WordPress site, upload the zip file and activate the plugin
+
+## Logging
+
+The plugin can log some more detailed information about autoupdate attempts.
+
+Logs are stored in `wp-content/uploads/plugin-autoupdate-filter-logs/` with daily rotation. Log retention period is configurable in settings (default 15 days).
+
+## Settings
+
+Navigate to **Settings > Plugin Autoupdate Filter**
+
+- **Enable Logging**: Turn detailed logging on/off
+- **Log Retention**: Number of days to keep logs (1-60 days)
 
 ### Notes on functionality
 
