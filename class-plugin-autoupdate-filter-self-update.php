@@ -22,10 +22,10 @@ class Plugin_Autoupdate_Filter_Self_Update {
 	/**
 	 * Check for updates to this plugin
 	 *
-	 * @param array  $update   Array of update data.
-	 * @param array  $plugin_data Array of plugin data.
-	 * @param string $plugin_file Path to plugin file.
-	 * @param string $locales    Locale code.
+	 * @param array|false $update      Array of update data.
+	 * @param array       $plugin_data Array of plugin data.
+	 * @param string      $plugin_file Path to plugin file.
+	 * @param string[]    $locales     Array of locale codes.
 	 *
 	 * @return array|bool Array of update data or false if no update available.
 	 */
@@ -49,9 +49,13 @@ class Plugin_Autoupdate_Filter_Self_Update {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return;
+			return false;
 		} else {
 			$output = json_decode( wp_remote_retrieve_body( $response ), true );
+		}
+
+		if ( ! isset( $output['tag_name'], $output['html_url'], $output['assets'][0]['browser_download_url'] ) ) {
+			return false;
 		}
 
 		$new_version_number  = $output['tag_name'];
