@@ -14,6 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once 'includes/class-plugin-autoupdate-filter-helpers.php';
 
 class Plugin_Autoupdate_Filter {
+	/**
+	 * Option key that stores plugins for which this plugin's filters are disabled.
+	 */
+	private const DISABLED_PLUGIN_FILTERS_OPTION = 'plugin_autoupdate_filter_disabled_plugins';
 
 	/**
 	 * @var stdClass Holds the settings
@@ -54,6 +58,8 @@ class Plugin_Autoupdate_Filter {
 
 		//Append text to upgrade text on plugins page for plugins explicitly set to not autoupdate
 		add_action( 'admin_init', array( $this, 'output_upgrade_message_for_specific_plugins' ) );
+		add_action( 'admin_init', array( $this, 'maybe_handle_plugin_filter_toggle_request' ) );
+		add_action( 'admin_notices', array( $this, 'output_plugin_filter_toggle_admin_notice' ) );
 
 		// Always send auto-update emails to T51 concierge email address
 		add_filter( 'auto_plugin_theme_update_email', array( $this, 'filter_custom_update_emails' ), 10, 4 );
@@ -153,6 +159,10 @@ class Plugin_Autoupdate_Filter {
 			$update = false;
 		}
 
+		if ( $this->is_filter_disabled_for_plugin( $item ) ) {
+			return $update;
+		}
+
 		// no delay if site is a canary site
 		$site_url = wp_parse_url( home_url(), PHP_URL_HOST );
 		if ( isset( $this->settings->canary_sites ) && in_array( $site_url, $this->settings->canary_sites, true ) ) {
@@ -206,6 +216,10 @@ class Plugin_Autoupdate_Filter {
 	 * @return bool True to update, false to not update.
 	 */
 	public function filter_auto_update_specific_times( $update, $item ): bool {
+		if ( $this->is_filter_disabled_for_plugin( $item ) ) {
+			return (bool) $update;
+		}
+
 		$holidays = array(
 			'christmas' => array(
 				'start' => gmdate( 'Y' ) . '-12-23 00:00:00',
@@ -291,6 +305,11 @@ class Plugin_Autoupdate_Filter {
 	 * @return string Customized HTML for automatic update settings.
 	 */
 	public function filter_custom_setting_html( $html, $plugin_file, $plugin_data ): string {
+		$toggle_link_html = $this->get_plugin_filter_toggle_link_html( $plugin_file );
+
+		if ( $this->is_filter_disabled_for_plugin_file( $plugin_file ) ) {
+			return $html . $toggle_link_html;
+		}
 
 		// check if updates are explicitly blocked for this plugin
 		if ( function_exists( 'disable_autoupdate_specific_plugins' ) ) {
@@ -301,11 +320,192 @@ class Plugin_Autoupdate_Filter {
 			$plugin_allowed_to_update_bool = disable_autoupdate_specific_plugins( true, $plugin_obj );
 
 			if ( false === $plugin_allowed_to_update_bool ) {
-				return 'Autoupdates have been explicitly deactivated for this plugin.';
+				return 'Autoupdates have been explicitly deactivated for this plugin.' . $toggle_link_html;
 			}
 		}
 
-		return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>';
+		return 'Automatic updates managed by <strong>Plugin Autoupdate Filter</strong>' . $toggle_link_html;
+	}
+
+	/**
+	 * Get the HTML for the in-column link that toggles this plugin's filters.
+	 *
+	 * @param string $plugin_file Path to plugin file.
+	 *
+	 * @return string
+	 */
+	private function get_plugin_filter_toggle_link_html( string $plugin_file ): string {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			return '';
+		}
+
+		// Don't show this for the plugin-autoupdate-filter plugin itself in the auto-update column.
+		if ( 'plugin-autoupdate-filter/plugin-autoupdate-filter.php' === $plugin_file ) {
+			return '';
+		}
+
+		$is_disabled = $this->is_filter_disabled_for_plugin_file( $plugin_file );
+		$action      = $is_disabled ? 'enable' : 'disable';
+		$label       = $is_disabled ? 'Enable PAF updates' : 'Disable PAF updates';
+		$url         = wp_nonce_url(
+			add_query_arg(
+				array(
+					'paf_toggle_filter_plugin' => $plugin_file,
+					'paf_filter_action'        => $action,
+				),
+				admin_url( 'plugins.php' )
+			),
+			'paf_toggle_filter_' . $plugin_file
+		);
+
+		return '<br><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a>';
+	}
+
+	/**
+	 * Handle requests that toggle this plugin's filters for a specific plugin.
+	 */
+	public function maybe_handle_plugin_filter_toggle_request(): void {
+		if ( ! isset( $_GET['paf_toggle_filter_plugin'], $_GET['paf_filter_action'], $_GET['_wpnonce'] ) || ! current_user_can( 'update_plugins' ) ) {
+			return;
+		}
+
+		$plugin_file = plugin_basename( sanitize_text_field( wp_unslash( $_GET['paf_toggle_filter_plugin'] ) ) );
+		$action      = sanitize_key( wp_unslash( $_GET['paf_filter_action'] ) );
+		$nonce       = sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) );
+
+		if ( ! in_array( $action, array( 'enable', 'disable' ), true ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $nonce, 'paf_toggle_filter_' . $plugin_file ) ) {
+			return;
+		}
+
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$installed_plugins = get_plugins();
+		if ( ! isset( $installed_plugins[ $plugin_file ] ) ) {
+			return;
+		}
+
+		$disabled_plugins = $this->get_filter_disabled_plugins();
+		if ( 'disable' === $action && ! in_array( $plugin_file, $disabled_plugins, true ) ) {
+			$disabled_plugins[] = $plugin_file;
+		}
+
+		if ( 'enable' === $action ) {
+			$disabled_plugins = array_values(
+				array_filter(
+					$disabled_plugins,
+					function( $disabled_plugin_file ) use ( $plugin_file ) {
+						return $disabled_plugin_file !== $plugin_file;
+					}
+				)
+			);
+		}
+
+		update_site_option( self::DISABLED_PLUGIN_FILTERS_OPTION, $disabled_plugins );
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'paf_filter_toggled' => $action,
+					'paf_filter_plugin'  => $plugin_file,
+				),
+				admin_url( 'plugins.php' )
+			)
+		);
+		exit;
+	}
+
+	/**
+	 * Show an admin notice after toggling plugin filter behavior.
+	 */
+	public function output_plugin_filter_toggle_admin_notice(): void {
+		if ( ! isset( $_GET['paf_filter_toggled'], $_GET['paf_filter_plugin'] ) ) {
+			return;
+		}
+
+		global $pagenow;
+		if ( 'plugins.php' !== $pagenow ) {
+			return;
+		}
+
+		$action      = sanitize_key( wp_unslash( $_GET['paf_filter_toggled'] ) );
+		$plugin_file = plugin_basename( sanitize_text_field( wp_unslash( $_GET['paf_filter_plugin'] ) ) );
+
+		if ( ! in_array( $action, array( 'enable', 'disable' ), true ) || empty( $plugin_file ) ) {
+			return;
+		}
+
+		if ( 'disable' === $action ) {
+			echo '<div class="notice notice-success is-dismissible"><p>Plugin Autoupdate Filter rules are now disabled for <code>' . esc_html( $plugin_file ) . '</code>. WordPress plugin auto-update controls now apply.</p></div>';
+			return;
+		}
+
+		echo '<div class="notice notice-success is-dismissible"><p>Plugin Autoupdate Filter rules are now enabled for <code>' . esc_html( $plugin_file ) . '</code>.</p></div>';
+	}
+
+	/**
+	 * Get a normalized list of plugin files for which this plugin's filters are disabled.
+	 *
+	 * @return array
+	 */
+	private function get_filter_disabled_plugins(): array {
+		$disabled_plugins = get_site_option( self::DISABLED_PLUGIN_FILTERS_OPTION, array() );
+
+		if ( ! is_array( $disabled_plugins ) ) {
+			return array();
+		}
+
+		return array_values(
+			array_unique(
+				array_map(
+					'plugin_basename',
+					array_filter( $disabled_plugins, 'is_string' )
+				)
+			)
+		);
+	}
+
+	/**
+	 * Determine whether plugin filters are disabled for a plugin file.
+	 *
+	 * @param string $plugin_file Path to plugin file.
+	 *
+	 * @return bool
+	 */
+	private function is_filter_disabled_for_plugin_file( string $plugin_file ): bool {
+		return in_array( plugin_basename( $plugin_file ), $this->get_filter_disabled_plugins(), true );
+	}
+
+	/**
+	 * Determine whether plugin filters are disabled for a plugin update item.
+	 *
+	 * @param object $item The plugin update object.
+	 *
+	 * @return bool
+	 */
+	private function is_filter_disabled_for_plugin( $item ): bool {
+		$plugin_file = empty( $item->plugin ) ? '' : plugin_basename( $item->plugin );
+
+		if ( ! empty( $plugin_file ) ) {
+			return $this->is_filter_disabled_for_plugin_file( $plugin_file );
+		}
+
+		if ( empty( $item->slug ) || ! function_exists( 'get_plugins' ) ) {
+			return false;
+		}
+
+		foreach ( array_keys( get_plugins() ) as $installed_plugin_file ) {
+			if ( dirname( $installed_plugin_file ) === $item->slug ) {
+				return $this->is_filter_disabled_for_plugin_file( $installed_plugin_file );
+			}
+		}
+
+		return false;
 	}
 
 	/**
