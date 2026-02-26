@@ -24,7 +24,13 @@ By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eas
 
 ### Centralized settings
 
-By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings. If you use this plugin and aren't part of the team, then we recommend you either set up your own endpoint or remove that portion of the code. 
+By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings. If you use this plugin and aren't part of the team, then we recommend you either set up your own endpoint or remove that portion of the code.
+
+The payload supports:
+
+- `disable_all` to disable all automatic updates.
+- `canary_sites` to bypass release-delay behavior for selected sites.
+- `disabled_plugins` to disable automatic updates for specific plugins across connected sites.
 
 ## Support
 
