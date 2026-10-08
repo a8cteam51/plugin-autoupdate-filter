@@ -24,7 +24,7 @@ By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eas
 
 ### Centralized settings
 
-By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings, so our settings also apply to any site using it. If you use this plugin on a site that is not managed by the WordPress Special Projects team, we recommend you either set up your own endpoint add a filter to skip the request (add it outside this plugin's own files, since the plugin updates itself from this repository's releases):
+By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings, so our settings also apply to any site using it. If you use this plugin on a site that is not managed by the WordPress Special Projects team, we recommend you either set up your own endpoint or add a filter to skip the request (add it outside this plugin's own files, since the plugin updates itself from this repository's releases):
 
 ```
 function custom_skip_autoupdate_central_settings() {
