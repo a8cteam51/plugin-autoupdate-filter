@@ -7,7 +7,7 @@ Filters whether autoupdates are on based on day/time and other settings.
 ## What's this?
 This is a plugin that the WordPress Special Projects team uses on many of their partner sites in order to help manage autoupdates in a responsible way. For example:
 1. It defaults autoupdates to be on. Keeping plugins up-to-date is one of the the first lines of defense against malicious attacks and technical debt.
-2. It provides various mechanisms by which we can turn off autoupdates, such as during specific days/times, for specific plugins, or centralized settings which can turn off all autoupdates.
+2. It provides various mechanisms by which we can turn off autoupdates, such as during specific days/times or for specific plugins.
 
 ## Usage
 
@@ -22,15 +22,7 @@ It's a good idea to load this as a normal plugin (rather than an mu-plugin), so 
 
 By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eastern, and Fri 6am-3pm Eastern. The 13 hour days are because the cron event which checks for autoupdates only runs every 12 hours, and so if the window isn't more than 12 hours at least once during the week, we run the risk of missing updates completely.
 
-### Centralized settings
-
-By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings. If you use this plugin and aren't part of the team, then we recommend you either set up your own endpoint or remove that portion of the code.
-
-The payload supports:
-
-- `disable_all` to disable all automatic updates.
-- `canary_sites` to bypass release-delay behavior for selected sites.
-- `disabled_plugins` to disable automatic updates for specific plugins across connected sites.
+This plugin doesn't change who receives automatic update emails or whether they are sent. WordPress defaults apply (emails go to the site admin email) unless the host or another plugin filters them; for example, WordPress.com Atomic turns them off.
 
 ## Support
 
