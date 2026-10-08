@@ -22,7 +22,7 @@ It's a good idea to load this as a normal plugin (rather than an mu-plugin), so 
 
 By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eastern, and Fri 6am-3pm Eastern. The 13 hour days are because the cron event which checks for autoupdates only runs every 12 hours, and so if the window isn't more than 12 hours at least once during the week, we run the risk of missing updates completely.
 
-Automatic update emails are left to WordPress, so they go to the site admin email.
+This plugin doesn't change who receives automatic update emails or whether they are sent. WordPress defaults apply (emails go to the site admin email) unless the host or another plugin filters them; for example, WordPress.com Atomic turns them off.
 
 ## Support
 
