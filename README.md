@@ -24,13 +24,23 @@ By default, the plugin always returns `true` for autoupdates Mon-Thu 6am-7pm Eas
 
 ### Centralized settings
 
-By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings. If you use this plugin and aren't part of the team, then we recommend you either set up your own endpoint or remove that portion of the code.
+By default, this plugin checks an endpoint set up by the WordPress Special Projects team to get centralized settings, so our settings also apply to any site using it. If you use this plugin on a site that is not managed by the WordPress Special Project, we recommend adding a filter to skip the request (add it outside this plugin's own files, since the plugin updates itself from this repository's releases):
+
+```
+function custom_skip_autoupdate_central_settings() {
+    return (object) array(); // no centralized settings
+}
+add_filter( 'pre_transient_wpcpmsp_auto_update_settings', 'custom_skip_autoupdate_central_settings' );
+```
 
 The payload supports:
 
 - `disable_all` to disable all automatic updates.
 - `canary_sites` to bypass release-delay behavior for selected sites.
 - `disabled_plugins` to disable automatic updates for specific plugins across connected sites.
+
+Note: If the plugin can't get valid settings from the endpoint, it disables all automatic updates until it can.
+
 
 ## Support
 
@@ -97,4 +107,28 @@ function disable_autoupdate_specific_plugins ( $update, $item ) {
     }
 }
 add_filter( 'auto_update_plugin', 'disable_autoupdate_specific_plugins', 11, 2 );
+```
+
+### Update notification emails
+
+By default, this plugin sends **all** automatic update emails to the WordPress Special Projects team at `concierge@wordpress.com`, instead of the site's admin email. This includes:
+
+- Plugin and theme auto-update emails (`auto_plugin_theme_update_email`)
+- Core auto-update emails (`auto_core_update_email`)
+- Debug emails (`automatic_updates_debug_email`), which are sent after every automatic update run, not just on failures
+
+It also forces these emails on, even if they were turned off elsewhere (for example, by a platform-level mu-plugin).
+
+**If you use this plugin for a site that is not managed by the WordPress Special Projects team, change this before activating the plugin on your sites.** Otherwise, your sites' update reports, including site URLs and plugin lists, will go to our team and your site's admin.
+
+We recommend sending the emails to your own address with a filter at a priority higher than 10. Add it in a separate plugin, **not** in this plugin's files: the plugin updates itself from this repository's releases, so any edits to its code will be overwritten.
+
+```
+function custom_autoupdate_email_recipient( $email ) {
+    $email['to'] = get_site_option( 'admin_email' ); // or your own address
+    return $email;
+}
+add_filter( 'auto_plugin_theme_update_email', 'custom_autoupdate_email_recipient', 20 );
+add_filter( 'auto_core_update_email', 'custom_autoupdate_email_recipient', 20 );
+add_filter( 'automatic_updates_debug_email', 'custom_autoupdate_email_recipient', 20 );
 ```
