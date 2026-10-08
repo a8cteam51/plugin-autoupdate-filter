@@ -119,9 +119,9 @@ By default, this plugin sends **all** automatic update emails to the WordPress S
 
 It also forces these emails on, even if they were turned off elsewhere (for example, by a platform-level mu-plugin).
 
-**If you use this plugin for a site that is not managed by the WordPress Special Projects team, change this before activating the plugin on your sites.** Otherwise, your sites' update reports, including site URLs and plugin lists, will go to our team and your site's admin.
+**If you use this plugin for a site that is not managed by the WordPress Special Projects team, change this before activating the plugin on your sites.** Otherwise, your sites' update reports, including site URLs and plugin lists, will go to our team and **not** to your site's admin.
 
-We recommend sending the emails to your own address with a filter at a priority higher than 10. Add it in a separate plugin, **not** in this plugin's files: the plugin updates itself from this repository's releases, so any edits to its code will be overwritten.
+We recommend sending the emails to your own address with a filter at a priority higher than 10. (Add it in a separate plugin, not in this plugin's files: the plugin updates itself from this repository's releases, so any edits to its code will be overwritten).
 
 ```
 function custom_autoupdate_email_recipient( $email ) {
