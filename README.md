@@ -111,7 +111,7 @@ add_filter( 'auto_update_plugin', 'disable_autoupdate_specific_plugins', 11, 2 )
 
 ### Update notification emails
 
-By default, this plugin sends **all** automatic update emails to the WordPress Special Projects team at `concierge@wordpress.com`, instead of the site's admin email. This includes:
+By default, this plugin sends **all** automatic update emails to the WordPress Special Projects team's email, instead of the site's admin email. This includes:
 
 - Plugin and theme auto-update emails (`auto_plugin_theme_update_email`)
 - Core auto-update emails (`auto_core_update_email`)
